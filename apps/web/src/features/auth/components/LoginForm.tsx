@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLoginMutation } from '../api/authApi'
+import { isDemoHost } from '../../../shared/env/devMode'
 
 interface FormErrors {
   email?: string
@@ -10,9 +11,13 @@ interface FormErrors {
 const inputClass =
   'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500'
 
+const DEMO = isDemoHost()
+const DEMO_EMAIL = 'demo@chessreader.app'
+const DEMO_PASSWORD = 'demo1234'
+
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState(DEMO ? DEMO_EMAIL : '')
+  const [password, setPassword] = useState(DEMO ? DEMO_PASSWORD : '')
   const [errors, setErrors] = useState<FormErrors>({})
   const mutation = useLoginMutation()
 
@@ -37,11 +42,15 @@ export default function LoginForm() {
       className="mx-auto mt-16 max-w-md space-y-4 rounded-lg bg-white p-8 shadow"
     >
       <h1 className="text-xl font-bold">Login</h1>
+
+      {DEMO && (
+        <p className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+          Demo mode — credentials pre-filled. Just click Login.
+        </p>
+      )}
+
       <div>
-        <label
-          htmlFor="email"
-          className="block text-sm font-medium text-slate-700"
-        >
+        <label htmlFor="email" className="block text-sm font-medium text-slate-700">
           Email
         </label>
         <input
@@ -58,10 +67,7 @@ export default function LoginForm() {
         )}
       </div>
       <div>
-        <label
-          htmlFor="password"
-          className="block text-sm font-medium text-slate-700"
-        >
+        <label htmlFor="password" className="block text-sm font-medium text-slate-700">
           Password
         </label>
         <input
@@ -87,7 +93,7 @@ export default function LoginForm() {
         disabled={mutation.isPending}
         className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700 disabled:opacity-50"
       >
-        Login
+        {mutation.isPending ? 'Logging in…' : 'Login'}
       </button>
       <p className="text-center text-sm text-slate-600">
         No account?{' '}

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import React from 'react'
 
 vi.mock('../../../shared/api/httpClient', () => ({
@@ -10,6 +11,12 @@ vi.mock('../../../shared/api/httpClient', () => ({
   },
 }))
 
+// isDemoHost must return false so LoginForm doesn't pre-fill in tests
+vi.mock('../../../shared/env/devMode', () => ({
+  isDemoHost: vi.fn(() => false),
+  isLocalhostHost: vi.fn(() => false),
+}))
+
 import { httpClient } from '../../../shared/api/httpClient'
 import { useRegisterMutation, useLoginMutation } from '../api/authApi'
 
@@ -17,7 +24,11 @@ const mockHttp = vi.mocked(httpClient)
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  return React.createElement(QueryClientProvider, { client: qc }, children)
+  return React.createElement(
+    MemoryRouter,
+    null,
+    React.createElement(QueryClientProvider, { client: qc }, children),
+  )
 }
 
 describe('authApi', () => {
@@ -35,7 +46,7 @@ describe('authApi', () => {
   })
 
   it('useLoginMutation calls POST /api/auth/login', async () => {
-    mockHttp.mockResolvedValue({ token: 'jwt.here' })
+    mockHttp.mockResolvedValue({ token: 'eyJ.eyJzdWIiOjEsImVtYWlsIjoiYUBiLmNvbSIsInJvbGUiOiJ1c2VyIiwic3RhdHVzIjoiYXBwcm92ZWQifQ.sig' })
     const { result } = renderHook(() => useLoginMutation(), { wrapper })
 
     await act(async () => {

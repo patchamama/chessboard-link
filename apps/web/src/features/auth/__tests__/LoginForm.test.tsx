@@ -9,6 +9,11 @@ vi.mock('../api/authApi', () => ({
   useLoginMutation: vi.fn(),
 }))
 
+vi.mock('../../../shared/env/devMode', () => ({
+  isDemoHost: vi.fn(() => false),
+  isLocalhostHost: vi.fn(() => false),
+}))
+
 import { useLoginMutation } from '../api/authApi'
 const mockUseMutation = vi.mocked(useLoginMutation)
 
