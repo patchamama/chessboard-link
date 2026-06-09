@@ -22,6 +22,6 @@ class HealthEndpointTest extends TestCase
         $decoded = json_decode($body, true);
 
         $this->assertSame('ok', $decoded['status']);
-        $this->assertSame('0.3.0', $decoded['version']);
+        $this->assertSame('0.4.0', $decoded['version']);
     }
 }

@@ -9,6 +9,8 @@ use App\Application\Auth\Port\PasswordHasher;
 use App\Application\Auth\Port\TokenIssuer;
 use App\Application\Auth\RegisterUserHandler;
 use App\Application\Auth\RejectUserHandler;
+use App\Application\Ingestion\ParseWebsiteHandler;
+use App\Application\Ingestion\ProcessEpubHandler;
 use App\Application\Library\GetChapterHandler;
 use App\Application\Library\ListBooksHandler;
 use App\Domain\Auth\UserRepository;
@@ -18,9 +20,15 @@ use App\Infrastructure\Auth\JwtTokenIssuer;
 use App\Infrastructure\Persistence\ConnectionFactory;
 use App\Infrastructure\Persistence\DbalBookRepository;
 use App\Infrastructure\Persistence\DbalUserRepository;
+use App\Infrastructure\Epub\NcxTocParser;
+use App\Infrastructure\Epub\OpfManifestParser;
+use App\Infrastructure\Epub\ZipEpubExtractor;
+use App\Infrastructure\Web\GuzzleHtmlFetcher;
+use App\Infrastructure\Web\ReadabilityExtractor;
 use App\Presentation\Admin\AdminController;
 use App\Presentation\Auth\AuthController;
 use App\Presentation\Health\HealthController;
+use App\Presentation\Ingestion\IngestionController;
 use App\Presentation\Library\LibraryController;
 use App\Presentation\Middleware\AuthMiddleware;
 use App\Presentation\Middleware\RequireAdminMiddleware;
@@ -124,6 +132,36 @@ return [
         return new LibraryController(
             $c->get(ListBooksHandler::class),
             $c->get(GetChapterHandler::class),
+        );
+    },
+
+    ZipEpubExtractor::class  => fn() => new ZipEpubExtractor(),
+    NcxTocParser::class      => fn() => new NcxTocParser(),
+    OpfManifestParser::class => fn() => new OpfManifestParser(),
+    GuzzleHtmlFetcher::class => fn() => new GuzzleHtmlFetcher(),
+    ReadabilityExtractor::class => fn() => new ReadabilityExtractor(),
+
+    ProcessEpubHandler::class => function (ContainerInterface $c) {
+        return new ProcessEpubHandler(
+            $c->get(BookRepository::class),
+            $c->get(ZipEpubExtractor::class),
+            $c->get(NcxTocParser::class),
+            $c->get(OpfManifestParser::class),
+        );
+    },
+
+    ParseWebsiteHandler::class => function (ContainerInterface $c) {
+        return new ParseWebsiteHandler(
+            $c->get(BookRepository::class),
+            $c->get(GuzzleHtmlFetcher::class),
+            $c->get(ReadabilityExtractor::class),
+        );
+    },
+
+    IngestionController::class => function (ContainerInterface $c) {
+        return new IngestionController(
+            $c->get(ProcessEpubHandler::class),
+            $c->get(ParseWebsiteHandler::class),
         );
     },
 ];

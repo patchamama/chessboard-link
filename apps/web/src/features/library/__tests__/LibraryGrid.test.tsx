@@ -4,6 +4,13 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../api/libraryApi', () => ({
   useBooks: vi.fn(),
+  useUploadBook: () => ({
+    mutateAsync: async () => {},
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: () => {},
+  }),
 }))
 
 import type { UseQueryResult } from '@tanstack/react-query'

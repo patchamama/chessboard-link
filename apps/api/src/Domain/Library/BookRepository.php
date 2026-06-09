@@ -13,6 +13,8 @@ interface BookRepository
 
     public function save(Book $book): int;
 
+    public function saveChapter(int $bookId, int $order, string $title, string $html): int;
+
     /** @return Chapter[] */
     public function findChaptersByBook(int $bookId): array;
 

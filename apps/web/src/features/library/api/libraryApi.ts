@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { httpClient } from '../../../shared/api/httpClient'
 
 export interface Book {
@@ -30,5 +30,44 @@ export function useChapter(bookId: number, chapterOrder: number) {
   return useQuery<Chapter>({
     queryKey: ['library', 'chapter', bookId, chapterOrder],
     queryFn: () => httpClient<Chapter>(`/api/library/books/${bookId}/chapters/${chapterOrder}`),
+  })
+}
+
+export interface UploadInput {
+  file?: File
+  url?: string
+}
+
+export interface UploadResult {
+  bookId: number
+  status: string
+}
+
+export function useUploadBook() {
+  const queryClient = useQueryClient()
+
+  return useMutation<UploadResult, Error, UploadInput>({
+    mutationFn: async (input: UploadInput) => {
+      if (input.file) {
+        const formData = new FormData()
+        formData.append('file', input.file)
+        // For multipart we skip the default Content-Type header (browser sets boundary)
+        return httpClient<UploadResult>('/api/library/upload', {
+          method: 'POST',
+          headers: {},
+          body: formData,
+        })
+      }
+      if (input.url) {
+        return httpClient<UploadResult>('/api/library/upload', {
+          method: 'POST',
+          body: JSON.stringify({ url: input.url }),
+        })
+      }
+      throw new Error('Provide a file or a URL')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['library', 'books'] })
+    },
   })
 }
