@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Application\Diagram\Port\DiagramRenderer;
+use App\Application\Diagram\Port\PngExporter;
+use App\Application\Diagram\RegenerateDiagramHandler;
 use App\Application\Eval\EvaluateGameHandler;
 use App\Application\Eval\EvaluatePositionHandler;
 use App\Application\Eval\Port\ChessEngine;
@@ -25,6 +28,10 @@ use App\Application\Library\GetChapterHandler;
 use App\Application\Library\ListBooksHandler;
 use App\Domain\Auth\UserRepository;
 use App\Domain\Library\BookRepository;
+use App\Infrastructure\Diagram\FilenamePreservingWriter;
+use App\Infrastructure\Diagram\ResvgPngExporter;
+use App\Infrastructure\Diagram\SvgBoardRenderer;
+use App\Presentation\Diagram\DiagramController;
 use App\Infrastructure\Auth\BcryptPasswordHasher;
 use App\Infrastructure\Auth\JwtTokenIssuer;
 use App\Infrastructure\Persistence\ConnectionFactory;
@@ -222,5 +229,27 @@ return [
             $c->get(EvaluatePositionHandler::class),
             $c->get(EvaluateGameHandler::class),
         );
+    },
+
+    // Diagram
+    DiagramRenderer::class => function (ContainerInterface $c) {
+        $pieceDir = dirname(__DIR__, 3) . '/css/images/pieces/merida';
+        return new SvgBoardRenderer($pieceDir);
+    },
+
+    PngExporter::class => fn() => new ResvgPngExporter(),
+
+    FilenamePreservingWriter::class => fn() => new FilenamePreservingWriter(),
+
+    RegenerateDiagramHandler::class => function (ContainerInterface $c) {
+        return new RegenerateDiagramHandler(
+            $c->get(ChessEngine::class),
+            $c->get(DiagramRenderer::class),
+            $c->get(PngExporter::class),
+        );
+    },
+
+    DiagramController::class => function (ContainerInterface $c) {
+        return new DiagramController($c->get(RegenerateDiagramHandler::class));
     },
 ];

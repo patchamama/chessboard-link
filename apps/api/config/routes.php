@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Presentation\Admin\AdminController;
 use App\Presentation\Auth\AuthController;
+use App\Presentation\Diagram\DiagramController;
 use App\Presentation\Eval\EvalController;
 use App\Presentation\Health\HealthController;
 use App\Presentation\Ingestion\IngestionController;
@@ -40,6 +41,11 @@ return function (App $app): void {
     $app->group('/api/eval', function (RouteCollectorProxy $group) {
         $group->post('/position', [EvalController::class, 'position']);
         $group->post('/game', [EvalController::class, 'game']);
+    })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
+
+    // Diagram routes (require JWT + Approved)
+    $app->group('/api/diagrams', function (RouteCollectorProxy $group) {
+        $group->post('/regenerate', [DiagramController::class, 'regenerate']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
 
     // Library routes (require JWT + Approved)
