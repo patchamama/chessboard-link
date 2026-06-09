@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS books (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'uploaded',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS chapters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id INTEGER NOT NULL,
+    ord INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    html TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (book_id) REFERENCES books(id)
+);

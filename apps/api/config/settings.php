@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'version'            => '0.2.0',
+    'version'            => '0.3.0',
     'displayErrorDetails' => false,
     'db'  => [
         'path' => __DIR__ . '/../storage/chess.sqlite',

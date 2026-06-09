@@ -41,10 +41,12 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
         $container = $builder->build();
 
-        // Run migration on the in-memory connection
+        // Run migrations on the in-memory connection
         $connection = $container->get(\Doctrine\DBAL\Connection::class);
-        $migrationSql = file_get_contents(__DIR__ . '/../migrations/001_create_users.sql');
-        $connection->executeStatement($migrationSql);
+        foreach (['001_create_users.sql', '002_create_books.sql'] as $migration) {
+            $sql = file_get_contents(__DIR__ . '/../migrations/' . $migration);
+            $connection->executeStatement($sql);
+        }
 
         $this->container = $container;
         return $container;
