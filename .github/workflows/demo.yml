@@ -32,6 +32,9 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build chess-shared
+        run: pnpm --filter @chess-ebook/chess-shared build
+
       - name: Build demo
         working-directory: apps/web
         env:
