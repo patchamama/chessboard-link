@@ -1,10 +1,14 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useRegisterMutation } from '../api/authApi'
 
 interface FormErrors {
   email?: string
   password?: string
 }
+
+const inputClass =
+  'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500'
 
 export default function RegisterForm() {
   const [email, setEmail] = useState('')
@@ -15,7 +19,8 @@ export default function RegisterForm() {
   const validate = (): boolean => {
     const errs: FormErrors = {}
     if (!email.trim()) errs.email = 'Email is required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Invalid email format'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      errs.email = 'Invalid email format'
     if (!password) errs.password = 'Password is required'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -28,31 +33,70 @@ export default function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="mx-auto mt-16 max-w-md space-y-4 rounded-lg bg-white p-8 shadow"
+    >
+      <h1 className="text-xl font-bold">Register</h1>
       <div>
-        <label htmlFor="email">Email</label>
+        <label
+          htmlFor="email"
+          className="block text-sm font-medium text-slate-700"
+        >
+          Email
+        </label>
         <input
           id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className={inputClass}
         />
-        {errors.email && <p role="alert">{errors.email}</p>}
+        {errors.email && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {errors.email}
+          </p>
+        )}
       </div>
       <div>
-        <label htmlFor="password">Password</label>
+        <label
+          htmlFor="password"
+          className="block text-sm font-medium text-slate-700"
+        >
+          Password
+        </label>
         <input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          className={inputClass}
         />
-        {errors.password && <p role="alert">{errors.password}</p>}
+        {errors.password && (
+          <p role="alert" className="mt-1 text-sm text-red-600">
+            {errors.password}
+          </p>
+        )}
       </div>
-      {mutation.error && <p role="alert">{(mutation.error as Error).message}</p>}
-      <button type="submit" disabled={mutation.isPending}>
+      {mutation.error && (
+        <p role="alert" className="text-sm text-red-600">
+          {(mutation.error as Error).message}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={mutation.isPending}
+        className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+      >
         Register
       </button>
+      <p className="text-center text-sm text-slate-600">
+        Already registered?{' '}
+        <Link to="/login" className="font-medium text-slate-900 underline">
+          Login
+        </Link>
+      </p>
     </form>
   )
 }

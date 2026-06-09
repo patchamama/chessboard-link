@@ -71,8 +71,10 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 # Backend: PHP built-in server with public/ as docroot.
+# AUTH_DEV_BYPASS=1 makes login optional in dev (tokenless requests = synthetic admin).
 info "Starting PHP API on http://127.0.0.1:$API_PORT ..."
-php -S "127.0.0.1:$API_PORT" -t "$API_DIR/public" >/tmp/chess-api.log 2>&1 &
+AUTH_DEV_BYPASS="${AUTH_DEV_BYPASS:-1}" \
+  php -S "127.0.0.1:$API_PORT" -t "$API_DIR/public" >/tmp/chess-api.log 2>&1 &
 PIDS+=("$!")
 
 # Frontend: Vite dev server (proxies /api -> the backend).

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import RegisterForm from '../components/RegisterForm'
 
 vi.mock('../api/authApi', () => ({
@@ -13,7 +14,11 @@ const mockUseMutation = vi.mocked(useRegisterMutation)
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
-  return React.createElement(QueryClientProvider, { client: qc }, children)
+  return React.createElement(
+    MemoryRouter,
+    null,
+    React.createElement(QueryClientProvider, { client: qc }, children)
+  )
 }
 
 describe('RegisterForm', () => {

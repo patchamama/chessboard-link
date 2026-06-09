@@ -65,6 +65,7 @@ return [
         return new AuthMiddleware(
             $c->get('settings')['jwt']['secret'],
             $c->get(ResponseFactoryInterface::class),
+            $c->get('settings')['auth']['dev_bypass'] ?? false,
         );
     },
 

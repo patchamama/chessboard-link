@@ -17,6 +17,7 @@ final class AuthMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly string $jwtSecret,
         private readonly ResponseFactoryInterface $responseFactory,
+        private readonly bool $devBypass = false,
     ) {
     }
 
@@ -25,6 +26,16 @@ final class AuthMiddleware implements MiddlewareInterface
         $authHeader = $request->getHeaderLine('Authorization');
 
         if (!str_starts_with($authHeader, 'Bearer ')) {
+            if ($this->devBypass) {
+                // AUTH_DEV_BYPASS: tokenless local requests act as a synthetic admin.
+                $request = $request->withAttribute('auth_user', (object) [
+                    'sub'    => 0,
+                    'email'  => 'dev@localhost',
+                    'role'   => 'admin',
+                    'status' => 'approved',
+                ]);
+                return $handler->handle($request);
+            }
             return $this->unauthorized();
         }
 

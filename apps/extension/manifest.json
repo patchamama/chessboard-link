@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chess Ebook Parser",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Make chess blogs and sites interactive — detect games, view interactive boards.",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": ["<all_urls>"],
