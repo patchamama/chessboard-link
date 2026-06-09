@@ -6,23 +6,23 @@ ChessReader parses chess content — EPUBs, public URLs, plain text — recognis
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---|---|
-| 📚 **EPUB Library** | Upload and read chess books with inline interactive boards |
-| 🌐 **Web Parser** | Paste any public URL — ChessReader extracts and renders the chess content |
-| ♟️ **Interactive Viewer** | Click any move in the text to jump to that position on the board |
-| 🌿 **Variation Trees** | Full PGN variation support with collapsible branches |
-| 📊 **Stockfish Eval** | Live engine evaluation bar per move (WASM in-browser + native server-side) |
-| 🖼️ **Diagram Regeneration** | Replace external diagram images with locally rendered SVG boards |
-| 🧩 **Browser Extension** | MV3 Chrome/Edge extension — makes chess blogs interactive without the app |
-| 🔐 **Auth & Roles** | JWT-based login with user/admin roles and approval flow |
-| 🛠️ **Dev Bypass** | On `localhost`, login is optional — direct access to all features |
+| **EPUB Library** | Upload and read chess books with inline interactive boards |
+| **Web Parser** | Paste any public URL — ChessReader extracts and renders the chess content |
+| **Interactive Viewer** | Click any move in the text to jump to that position on the board |
+| **Variation Trees** | Full PGN variation support with collapsible branches |
+| **Stockfish Eval** | Live engine evaluation bar per move (WASM in-browser + native server-side) |
+| **Diagram Regeneration** | Replace external diagram images with locally rendered SVG boards |
+| **Browser Extension** | MV3 Chrome/Edge extension — makes chess blogs interactive without the app |
+| **Auth & Roles** | JWT-based login with user/admin roles and approval flow |
+| **Dev Bypass** | On `localhost`, login is optional — direct access to all features |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 chessreader/
@@ -38,7 +38,7 @@ The frontend and extension share the `chess-shared` package. The API is a standa
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
 ### Backend — `apps/api`
 ![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white)
@@ -82,7 +82,7 @@ The frontend and extension share the `chess-shared` package. The API is a standa
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -151,7 +151,7 @@ API_PORT=9000 WEB_PORT=4000 ADMIN_EMAIL=me@example.com ADMIN_PASSWORD=secret bas
 
 ---
 
-## 📖 Usage
+## Usage
 
 ### Library
 Upload an EPUB or a book URL → chapters appear in the library. Open a chapter and click any chess move to advance the board.
@@ -167,7 +167,7 @@ Visit `/admin` to approve or reject pending user accounts.
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ```bash
 # PHP backend (183 tests)
@@ -182,7 +182,7 @@ cd packages/chess-shared && pnpm test
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] Dark mode
 - [ ] PGN export from viewer
@@ -192,6 +192,6 @@ cd packages/chess-shared && pnpm test
 
 ---
 
-## 📄 License
+## License
 
 [MIT](LICENSE) · built with ♞ and a lot of coffee.
