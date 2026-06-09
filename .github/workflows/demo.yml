@@ -42,7 +42,9 @@ jobs:
         run: pnpm build
 
       - name: Copy mockServiceWorker.js to dist
-        run: cp apps/web/public/mockServiceWorker.js apps/web/dist/
+        # Vite copies public/ into dist/ but mockServiceWorker.js is gitignored in some setups.
+        # Copy explicitly to ensure it lands at /chessreader/mockServiceWorker.js on Pages.
+        run: cp apps/web/public/mockServiceWorker.js apps/web/dist/mockServiceWorker.js
 
       - uses: actions/upload-pages-artifact@v3
         with:

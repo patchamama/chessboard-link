@@ -10,7 +10,10 @@ import { isDemoHost } from './shared/env/devMode'
 async function prepare() {
   if (isDemoHost()) {
     const { worker } = await import('./demo/browser')
-    return worker.start({ onUnhandledRequest: 'bypass' })
+    // Resolve the SW script URL relative to the page's base path so it works
+    // both on localhost (base="/") and GitHub Pages (base="/chessreader/").
+    const swUrl = `${import.meta.env.BASE_URL}mockServiceWorker.js`
+    return worker.start({ serviceWorker: { url: swUrl }, onUnhandledRequest: 'bypass' })
   }
 }
 
