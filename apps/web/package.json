@@ -19,6 +19,7 @@
     "react-chessboard": "^5.10.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.17.0",
+    "stockfish": "^18.0.7",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

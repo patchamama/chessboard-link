@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Application\Eval\EvaluateGameHandler;
+use App\Application\Eval\EvaluatePositionHandler;
+use App\Application\Eval\Port\ChessEngine;
 use App\Application\Auth\ApproveUserHandler;
 use App\Application\Auth\ListPendingUsersHandler;
 use App\Application\Auth\LoginHandler;
@@ -12,6 +15,8 @@ use App\Application\Auth\RejectUserHandler;
 use App\Application\Ingestion\ParseWebsiteHandler;
 use App\Application\Ingestion\ProcessEpubHandler;
 use App\Application\Recognition\RecognizeMovesHandler;
+use App\Infrastructure\Chess\Engine\StockfishDownloader;
+use App\Infrastructure\Chess\Engine\UciStockfishEngine;
 use App\Infrastructure\Chess\Recognition\SanRecognizer;
 use App\Infrastructure\Chess\Recognition\SpanishNotationNormalizer;
 use App\Infrastructure\Chess\Recognition\VariationParser;
@@ -30,6 +35,7 @@ use App\Infrastructure\Epub\OpfManifestParser;
 use App\Infrastructure\Epub\ZipEpubExtractor;
 use App\Infrastructure\Web\GuzzleHtmlFetcher;
 use App\Infrastructure\Web\ReadabilityExtractor;
+use App\Presentation\Eval\EvalController;
 use App\Presentation\Admin\AdminController;
 use App\Presentation\Auth\AuthController;
 use App\Presentation\Health\HealthController;
@@ -184,5 +190,37 @@ return [
 
     RecognitionController::class => function (ContainerInterface $c) {
         return new RecognitionController($c->get(RecognizeMovesHandler::class));
+    },
+
+    // Eval
+    ChessEngine::class => function (ContainerInterface $c) {
+        $settings   = $c->get('settings');
+        $storageDir = $settings['storage_dir'] ?? dirname(__DIR__) . '/storage';
+        $downloader = new StockfishDownloader(
+            $storageDir,
+            fn() => PHP_OS_FAMILY,
+            fn() => php_uname('m'),
+        );
+        // Use system stockfish if available, fallback to storage
+        $systemBin = trim(shell_exec('which stockfish 2>/dev/null') ?? '');
+        $binPath   = ($systemBin !== '' && is_executable($systemBin))
+            ? $systemBin
+            : $downloader->binaryPath();
+        return new UciStockfishEngine($binPath);
+    },
+
+    EvaluatePositionHandler::class => function (ContainerInterface $c) {
+        return new EvaluatePositionHandler($c->get(ChessEngine::class));
+    },
+
+    EvaluateGameHandler::class => function (ContainerInterface $c) {
+        return new EvaluateGameHandler($c->get(ChessEngine::class));
+    },
+
+    EvalController::class => function (ContainerInterface $c) {
+        return new EvalController(
+            $c->get(EvaluatePositionHandler::class),
+            $c->get(EvaluateGameHandler::class),
+        );
     },
 ];

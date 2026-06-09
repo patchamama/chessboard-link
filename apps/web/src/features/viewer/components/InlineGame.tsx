@@ -1,5 +1,6 @@
 import type { RecognizedGame } from '@chess-ebook/chess-shared'
 import ChessBoard from '../../../shared/chess/ChessBoard'
+import EvalBar from './EvalBar'
 import MoveText from './MoveText'
 import VariationTree from './VariationTree'
 import { useGameNavigation } from '../hooks/useGameNavigation'
@@ -22,7 +23,9 @@ export default function InlineGame({ treeId, game, fullText }: InlineGameProps) 
   return (
     <div className="my-4 flex flex-col gap-2">
       <div className="flex gap-4 items-start">
-        <div className="w-48 shrink-0">
+        <div className="flex gap-2 shrink-0">
+          <EvalBar fen={fen} />
+          <div className="w-48">
           <ChessBoard fen={fen} orientation={orientation} lastMove={lastMove} />
           <div className="flex gap-1 mt-1">
             <button
@@ -53,6 +56,7 @@ export default function InlineGame({ treeId, game, fullText }: InlineGameProps) 
             >
               ⇅
             </button>
+          </div>
           </div>
         </div>
         <div className="flex-1">

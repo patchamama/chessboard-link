@@ -22,9 +22,9 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         return $app;
     }
 
-    protected function buildContainer(): ContainerInterface
+    protected function buildContainer(array $extraDefinitions = []): ContainerInterface
     {
-        if ($this->container !== null) {
+        if ($this->container !== null && empty($extraDefinitions)) {
             return $this->container;
         }
 
@@ -35,7 +35,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         $definitions = require __DIR__ . '/../config/di_definitions.php';
 
         $builder = new ContainerBuilder();
-        $builder->addDefinitions(array_merge($definitions, [
+        $builder->addDefinitions(array_merge($definitions, $extraDefinitions, [
             'settings' => $settings,
         ]));
 
@@ -48,7 +48,19 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             $connection->executeStatement($sql);
         }
 
-        $this->container = $container;
+        if (empty($extraDefinitions)) {
+            $this->container = $container;
+        }
+
         return $container;
+    }
+
+    protected function createAppWithOverrides(array $extraDefinitions): App
+    {
+        $container = $this->buildContainer($extraDefinitions);
+        $app = Bridge::create($container);
+        $routes = require __DIR__ . '/../config/routes.php';
+        $routes($app);
+        return $app;
     }
 }
