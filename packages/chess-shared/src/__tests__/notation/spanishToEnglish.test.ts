@@ -76,4 +76,17 @@ describe('spanishToEnglish (full text)', () => {
   it('Dama (D) -> Queen (Q)', () => {
     expect(spanishToEnglish('5. Dd5 Dxd5')).toContain('Qd5');
   });
+
+  it('does NOT convert Re1 to Ke1 in English notation (regression)', () => {
+    // English text uses K/N/Q — Re1 means Rook e1, must not become Ke1
+    const english = '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 10. Re1 Nge7'
+    const result = spanishToEnglish(english)
+    expect(result).toContain('Re1')
+    expect(result).not.toContain('Ke1')
+  });
+
+  it('does NOT convert O-O to mangled form in English notation', () => {
+    const english = '7. O-O d3 8. Qb3 Qf6'
+    expect(spanishToEnglish(english)).toBe('7. O-O d3 8. Qb3 Qf6')
+  });
 });
