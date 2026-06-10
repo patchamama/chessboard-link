@@ -23,11 +23,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # web's typecheck resolves @chess-ebook/chess-shared types from its dist/
+      - name: Build chess-shared
+        run: pnpm --filter chess-shared build
+
       - name: Lint
         run: pnpm --filter web lint
 
       - name: Typecheck
-        run: pnpm --filter web typecheck && pnpm --filter chess-shared typecheck
+        run: pnpm --filter chess-shared typecheck && pnpm --filter web typecheck
 
       - name: Test (web)
         run: pnpm --filter web test
