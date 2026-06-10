@@ -1,5 +1,5 @@
 {
-  "description": "Illegal move: 1. e4 e5 2. Nc4 (illegal — no knight can go to c4 from start)",
+  "description": "Illegal move: 1. e4 e5 2. Nc4 (illegal — no knight can go to c4 from start). Invalid node stored in tree.nodes but NOT in mainline.",
   "inputText": "1. e4 e5 2. Nc4",
   "expectedMainline": [
     {
@@ -17,15 +17,12 @@
       "fenFields123": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq",
       "moveNumber": 1,
       "color": "black"
-    },
-    {
-      "san": "Nc4",
-      "from": "",
-      "to": "",
-      "fenFields123": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq",
-      "moveNumber": 2,
-      "color": "white",
-      "invalid": true
     }
-  ]
+  ],
+  "expectedInvalidMove": {
+    "san": "Nc4",
+    "from": "",
+    "to": "",
+    "invalid": true
+  }
 }

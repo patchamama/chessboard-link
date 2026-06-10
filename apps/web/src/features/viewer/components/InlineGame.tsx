@@ -55,13 +55,15 @@ export default function InlineGame({ treeId, game, fullText }: InlineGameProps) 
   )
 
   const boardArea = evalDirection === 'vertical' ? (
-    // Vertical: bar left of board, both stretch to same height
-    <div className="flex gap-1 items-stretch">
-      <EvalBar fen={displayFen} />
-      <div className="flex-1 flex flex-col">
-        <ChessBoard fen={displayFen} orientation={orientation} lastMove={lastMove} />
-        {navButtons}
+    // Vertical: bar left of board, both same height (only board, not nav buttons)
+    <div className="flex flex-col">
+      <div className="flex gap-1 items-stretch">
+        <EvalBar fen={displayFen} />
+        <div className="flex-1">
+          <ChessBoard fen={displayFen} orientation={orientation} lastMove={lastMove} />
+        </div>
       </div>
+      {navButtons}
     </div>
   ) : (
     // Horizontal: bar below board

@@ -60,7 +60,9 @@ export function spanishTokenToEnglish(token: string): string {
  * found, treat as English.
  */
 function isEnglishNotation(text: string): boolean {
-  const hasEnglish = /(?:^|[\s(])[KNQ](?=[a-h1-8x+#])/.test(text)
+  // English piece letters: K, Q, R, B, N — any before a square/capture
+  const hasEnglish = /(?:^|[\s(])[KQRBN](?=[a-h1-8x+#])/.test(text)
+  // Spanish-only piece letters: C (Caballo), D (Dama), T (Torre) — A (Alfil) excluded since B is common
   const hasSpanish  = /(?:^|[\s(])[CDT](?=[a-h1-8x+#])/.test(text)
   return hasEnglish && !hasSpanish
 }

@@ -89,11 +89,15 @@ function attachSf(worker) {
         self.postMessage({ type: 'eval', fen: currentFen, scoreCp: parseInt(cpM[1]), bestMove, depth });
       }
     } else {
-      if (depth < currentDepth - 2) return;
-      const entry = { idx, pv, depth };
-      if (mateM) entry.mate = parseInt(mateM[1]);
-      if (cpM)   entry.scoreCp = parseInt(cpM[1]);
-      pvMap.set(idx, entry);
+      // Keep the entry with the longest pv seen so far for this multipv index.
+      // SF10 emits shorter pvs at high depths; we want the richest line available.
+      const existing = pvMap.get(idx);
+      if (!existing || pv.length >= existing.pv.length || depth >= existing.depth) {
+        const entry = { idx, pv, depth };
+        if (mateM) entry.mate = parseInt(mateM[1]);
+        if (cpM)   entry.scoreCp = parseInt(cpM[1]);
+        pvMap.set(idx, entry);
+      }
     }
   };
 

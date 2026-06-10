@@ -138,6 +138,13 @@ export function buildGameTree(
     tree.nodes.set(nodeId, node);
 
     // Determine if we are on mainline or in a variation
+    // Invalid nodes are kept in tree.nodes (for debugging) but NOT in mainline/variations
+    // so the viewer never navigates to them.
+    if (isInvalid) {
+      ctx.dead = true;
+      continue;
+    }
+
     if (ctx.variationStack.length === 0) {
       // Mainline
       tree.mainline.push(nodeId);
@@ -166,16 +173,12 @@ export function buildGameTree(
     ctx.fenBeforeLastMove = fenBeforeMove;
     ctx.parentBeforeLastMove = parentId;
 
-    if (isInvalid) {
-      ctx.dead = true;
+    // Update move number tracking from token (already set by tokenizer)
+    if (token.color === 'black') {
+      ctx.moveNumber = (token.moveNumber ?? ctx.moveNumber) + 1;
+      ctx.color = 'white';
     } else {
-      // Update move number tracking from token (already set by tokenizer)
-      if (token.color === 'black') {
-        ctx.moveNumber = (token.moveNumber ?? ctx.moveNumber) + 1;
-        ctx.color = 'white';
-      } else {
-        ctx.color = 'black';
-      }
+      ctx.color = 'black';
     }
   }
 

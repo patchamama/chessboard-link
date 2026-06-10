@@ -88,10 +88,12 @@ describe('Golden parity: illegal-move', () => {
   it('marks illegal move as invalid', () => {
     const tree = buildFromFixture(fixture.inputText);
     const nodes = mainlineNodes(tree);
+    // Invalid node is NOT in mainline — mainline stops before it
     expect(nodes).toHaveLength(fixture.expectedMainline.length);
-    const invalidNode = nodes.find(n => n.invalid);
+    // Invalid node lives in tree.nodes but not mainline
+    const invalidNode = Array.from(tree.nodes.values()).find(n => n.invalid);
     expect(invalidNode).toBeDefined();
-    expect(invalidNode?.san).toBe(fixture.expectedMainline.find((m: { invalid?: boolean }) => m.invalid)!.san);
+    expect(invalidNode?.san).toBe(fixture.expectedInvalidMove.san);
     expect(invalidNode?.from).toBe('');
     expect(invalidNode?.to).toBe('');
   });

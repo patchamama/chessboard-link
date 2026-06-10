@@ -41,7 +41,7 @@ export function useEngineLines(fen: string, count = 5): { lines: EngineLine[]; l
     }
 
     setState({ lines: [], loading: true })
-    workerRef.current.postMessage({ type: 'lines', fen, count, depth: 16 })
+    workerRef.current.postMessage({ type: 'lines', fen, count, depth: 14 })
   }, [fen, count])
 
   return state

@@ -40,14 +40,16 @@ describe('buildGameTree', () => {
     expect(nodes[3]).toMatchObject({ moveNumber: 2, color: 'black' });
   });
 
-  it('marks illegal move as invalid and stops the line', () => {
+  it('stops mainline at illegal move (invalid node not in mainline)', () => {
     const tree = buildFromText('1. e4 e5 2. Nc4');
     const nodes = mainlineNodes(tree);
-    const invalidNode = nodes.find(n => n.san === 'Nc4');
+    // Invalid node is kept in tree.nodes for reference but NOT in mainline
+    const invalidNode = Array.from(tree.nodes.values()).find(n => n.san === 'Nc4');
     expect(invalidNode).toBeDefined();
     expect(invalidNode?.invalid).toBe(true);
-    // Only 3 mainline nodes: e4, e5, Nc4(invalid)
-    expect(nodes).toHaveLength(3);
+    // Mainline has only the 2 valid moves
+    expect(nodes).toHaveLength(2);
+    expect(nodes.map(n => n.san)).toEqual(['e4', 'e5']);
   });
 
   it('handles castling', () => {
