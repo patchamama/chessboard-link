@@ -24,13 +24,20 @@ return function (App $app): void {
     $app->group('/api/auth', function (RouteCollectorProxy $group) {
         $group->post('/register', [AuthController::class, 'register']);
         $group->post('/login', [AuthController::class, 'login']);
+        $group->post('/password-reset/request', [AuthController::class, 'requestReset']);
+        $group->post('/password-reset/confirm', [AuthController::class, 'resetPassword']);
     });
 
     // Admin routes (require JWT + Admin role)
     $app->group('/api/admin', function (RouteCollectorProxy $group) {
         $group->get('/pending-users', [AdminController::class, 'pendingUsers']);
-        $group->post('/users/{id}/approve', [AdminController::class, 'approve']);
-        $group->post('/users/{id}/reject', [AdminController::class, 'reject']);
+        $group->get('/active-users', [AdminController::class, 'activeUsers']);
+        $group->get('/blocked-users', [AdminController::class, 'blockedUsers']);
+        $group->get('/users/{id:[0-9]+}/books', [AdminController::class, 'userBooks']);
+        $group->post('/users/{id:[0-9]+}/approve', [AdminController::class, 'approve']);
+        $group->post('/users/{id:[0-9]+}/reject', [AdminController::class, 'reject']);
+        $group->post('/users/{id:[0-9]+}/password', [AdminController::class, 'setPassword']);
+        $group->post('/users/{id:[0-9]+}/send-reset', [AdminController::class, 'sendResetLink']);
     })->add(RequireAdminMiddleware::class)->add(AuthMiddleware::class);
 
     // Recognition route (require JWT + Approved)
@@ -58,6 +65,8 @@ return function (App $app): void {
     $app->group('/api/library', function (RouteCollectorProxy $group) {
         $group->get('/books', [LibraryController::class, 'books']);
         $group->get('/books/{id:[0-9]+}/chapters/{n:[0-9]+}', [LibraryController::class, 'chapter']);
+        $group->put('/books/{id:[0-9]+}', [LibraryController::class, 'updateBook']);
+        $group->post('/books/{id:[0-9]+}/touch', [LibraryController::class, 'touch']);
         $group->post('/upload', [IngestionController::class, 'upload']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
 };

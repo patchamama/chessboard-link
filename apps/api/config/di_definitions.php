@@ -8,13 +8,27 @@ use App\Application\Diagram\RegenerateDiagramHandler;
 use App\Application\Eval\EvaluateGameHandler;
 use App\Application\Eval\EvaluatePositionHandler;
 use App\Application\Eval\Port\ChessEngine;
+use App\Application\Admin\GetUserBooksHandler;
+use App\Application\Admin\ListUsersByStatusHandler;
+use App\Application\Admin\SetUserPasswordHandler;
 use App\Application\Auth\ApproveUserHandler;
 use App\Application\Auth\ListPendingUsersHandler;
 use App\Application\Auth\LoginHandler;
 use App\Application\Auth\Port\PasswordHasher;
+use App\Application\Auth\Port\PasswordResetNotifier;
+use App\Application\Auth\Port\TokenGenerator;
 use App\Application\Auth\Port\TokenIssuer;
 use App\Application\Auth\RegisterUserHandler;
 use App\Application\Auth\RejectUserHandler;
+use App\Application\Auth\RequestPasswordResetHandler;
+use App\Application\Auth\ResetPasswordHandler;
+use App\Application\Library\SetLastReadBookHandler;
+use App\Application\Library\UpdateBookHandler;
+use App\Domain\Auth\PasswordResetRepository;
+use App\Infrastructure\Auth\LoggingPasswordResetNotifier;
+use App\Infrastructure\Auth\RandomTokenGenerator;
+use App\Infrastructure\Persistence\DbalPasswordResetRepository;
+use App\Infrastructure\Persistence\UserMetricsReadModel;
 use App\Application\Ingestion\ParseWebsiteHandler;
 use App\Application\Ingestion\ProcessEpubHandler;
 use App\Application\Recognition\RecognizeMovesHandler;
@@ -122,10 +136,65 @@ return [
         return new ListPendingUsersHandler($c->get(UserRepository::class));
     },
 
+    PasswordResetRepository::class => function (ContainerInterface $c) {
+        return new DbalPasswordResetRepository($c->get(Connection::class));
+    },
+
+    PasswordResetNotifier::class => function (ContainerInterface $c) {
+        $settings = $c->get('settings');
+        $baseUrl  = $settings['app_base_url'] ?? '';
+        return new LoggingPasswordResetNotifier($baseUrl);
+    },
+
+    TokenGenerator::class => fn() => new RandomTokenGenerator(),
+
+    UserMetricsReadModel::class => function (ContainerInterface $c) {
+        return new UserMetricsReadModel($c->get(Connection::class));
+    },
+
+    ListUsersByStatusHandler::class => function (ContainerInterface $c) {
+        return new ListUsersByStatusHandler($c->get(UserRepository::class), $c->get(UserMetricsReadModel::class));
+    },
+
+    GetUserBooksHandler::class => function (ContainerInterface $c) {
+        return new GetUserBooksHandler($c->get(BookRepository::class));
+    },
+
+    SetUserPasswordHandler::class => function (ContainerInterface $c) {
+        return new SetUserPasswordHandler($c->get(UserRepository::class), $c->get(PasswordHasher::class));
+    },
+
+    RequestPasswordResetHandler::class => function (ContainerInterface $c) {
+        return new RequestPasswordResetHandler(
+            $c->get(UserRepository::class),
+            $c->get(PasswordResetRepository::class),
+            $c->get(TokenGenerator::class),
+            $c->get(PasswordResetNotifier::class),
+        );
+    },
+
+    ResetPasswordHandler::class => function (ContainerInterface $c) {
+        return new ResetPasswordHandler(
+            $c->get(PasswordResetRepository::class),
+            $c->get(UserRepository::class),
+            $c->get(PasswordHasher::class),
+        );
+    },
+
+    UpdateBookHandler::class => function (ContainerInterface $c) {
+        return new UpdateBookHandler($c->get(BookRepository::class));
+    },
+
+    SetLastReadBookHandler::class => function (ContainerInterface $c) {
+        return new SetLastReadBookHandler($c->get(UserRepository::class));
+    },
+
     AuthController::class => function (ContainerInterface $c) {
         return new AuthController(
             $c->get(RegisterUserHandler::class),
             $c->get(LoginHandler::class),
+            $c->get(RequestPasswordResetHandler::class),
+            $c->get(ResetPasswordHandler::class),
         );
     },
 
@@ -134,6 +203,11 @@ return [
             $c->get(ListPendingUsersHandler::class),
             $c->get(ApproveUserHandler::class),
             $c->get(RejectUserHandler::class),
+            $c->get(ListUsersByStatusHandler::class),
+            $c->get(GetUserBooksHandler::class),
+            $c->get(SetUserPasswordHandler::class),
+            $c->get(RequestPasswordResetHandler::class),
+            $c->get(UserRepository::class),
         );
     },
 
@@ -153,6 +227,8 @@ return [
         return new LibraryController(
             $c->get(ListBooksHandler::class),
             $c->get(GetChapterHandler::class),
+            $c->get(UpdateBookHandler::class),
+            $c->get(SetLastReadBookHandler::class),
         );
     },
 
