@@ -4,8 +4,9 @@ import LoginForm from '../features/auth/components/LoginForm'
 import RegisterForm from '../features/auth/components/RegisterForm'
 import RequireApproved from '../features/auth/guards/RequireApproved'
 import RequireAdmin from '../features/auth/guards/RequireAdmin'
-import PendingUsersTable from '../features/admin/components/PendingUsersTable'
+import AdminPage from '../features/admin/components/AdminPage'
 import LibraryGrid from '../features/library/components/LibraryGrid'
+import ResetPasswordPage from '../features/auth/components/ResetPasswordPage'
 import BookReader from '../features/library/components/BookReader'
 import WebparserView from '../features/webparser/components/WebparserView'
 import { isDemoHost } from '../shared/env/devMode'
@@ -19,6 +20,7 @@ const routes = [
       { path: '/login', element: <LoginForm /> },
       { path: '/register', element: <RegisterForm /> },
       { path: '/pending', element: <PendingPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
       {
         path: '/library',
         element: (
@@ -47,7 +49,7 @@ const routes = [
         path: '/admin',
         element: (
           <RequireAdmin>
-            <PendingUsersTable />
+            <AdminPage />
           </RequireAdmin>
         ),
       },

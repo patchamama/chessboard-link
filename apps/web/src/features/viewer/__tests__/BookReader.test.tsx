@@ -17,6 +17,7 @@ vi.mock('../../library/api/libraryApi', () => ({
     },
     isLoading: false,
   }),
+  useTouchBook: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 // Mock react-chessboard so jsdom doesn't fail on canvas/SVG

@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { useChapter } from '../api/libraryApi'
+import { useChapter, useTouchBook } from '../api/libraryApi'
 import { recognizeGames } from '@chess-ebook/chess-shared'
 import type { GameTree } from '@chess-ebook/chess-shared'
 import InlineGame from '../../viewer/components/InlineGame'
@@ -23,6 +23,15 @@ export default function BookReader() {
   }, [games, id])
 
   useKeyboardNavigation(treesMap)
+
+  const touchBook = useTouchBook()
+  useEffect(() => {
+    if (id) {
+      touchBook.mutate(id)
+    }
+    // Fire once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   if (isLoading) {
     return (
