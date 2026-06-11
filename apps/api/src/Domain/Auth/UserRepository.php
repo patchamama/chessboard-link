@@ -14,4 +14,10 @@ interface UserRepository
 
     /** @return User[] */
     public function findAllPending(): array;
+
+    /** @return User[] */
+    public function findAllApproved(): array;
+
+    /** @return User[] */
+    public function findAllRejected(): array;
 }

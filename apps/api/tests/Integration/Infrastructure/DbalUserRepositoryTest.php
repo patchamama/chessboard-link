@@ -24,8 +24,15 @@ class DbalUserRepositoryTest extends TestCase
             'memory' => true,
         ]);
 
-        $migrationSql = file_get_contents(__DIR__ . '/../../../migrations/001_create_users.sql');
-        $connection->executeStatement($migrationSql);
+        $connection->executeStatement(
+            file_get_contents(__DIR__ . '/../../../migrations/001_create_users.sql')
+        );
+        $connection->executeStatement(
+            file_get_contents(__DIR__ . '/../../../migrations/002_create_books.sql')
+        );
+        $connection->executeStatement(
+            file_get_contents(__DIR__ . '/../../../migrations/003_user_metrics_and_password_resets.sql')
+        );
 
         $this->repo = new DbalUserRepository($connection);
     }
@@ -74,6 +81,53 @@ class DbalUserRepositoryTest extends TestCase
 
         $found = $this->repo->findById($saved->id());
         $this->assertSame(RegistrationStatus::Approved, $found->status());
+    }
+
+    public function testFindAllApprovedReturnsOnlyApproved(): void
+    {
+        $pending  = new User(new UserId(0), 'pending@test.com', 'h', Role::User, RegistrationStatus::Pending, new DateTimeImmutable());
+        $approved = new User(new UserId(0), 'approved@test.com', 'h', Role::User, RegistrationStatus::Approved, new DateTimeImmutable());
+        $rejected = new User(new UserId(0), 'rejected@test.com', 'h', Role::User, RegistrationStatus::Rejected, new DateTimeImmutable());
+        $this->repo->save($pending);
+        $this->repo->save($approved);
+        $this->repo->save($rejected);
+
+        $result = $this->repo->findAllApproved();
+        $this->assertCount(1, $result);
+        $this->assertSame('approved@test.com', $result[0]->email());
+    }
+
+    public function testFindAllRejectedReturnsOnlyRejected(): void
+    {
+        $pending  = new User(new UserId(0), 'pending2@test.com', 'h', Role::User, RegistrationStatus::Pending, new DateTimeImmutable());
+        $approved = new User(new UserId(0), 'approved2@test.com', 'h', Role::User, RegistrationStatus::Approved, new DateTimeImmutable());
+        $rejected = new User(new UserId(0), 'rejected2@test.com', 'h', Role::User, RegistrationStatus::Rejected, new DateTimeImmutable());
+        $this->repo->save($pending);
+        $this->repo->save($approved);
+        $this->repo->save($rejected);
+
+        $result = $this->repo->findAllRejected();
+        $this->assertCount(1, $result);
+        $this->assertSame('rejected2@test.com', $result[0]->email());
+    }
+
+    public function testSavePersistsAndHydratesLoginCountAndLastReadBookId(): void
+    {
+        $user = new User(
+            new UserId(0),
+            'metrics@test.com',
+            'hash',
+            Role::User,
+            RegistrationStatus::Approved,
+            new DateTimeImmutable(),
+            loginCount: 7,
+            lastReadBookId: 42,
+        );
+        $saved = $this->repo->save($user);
+
+        $found = $this->repo->findById($saved->id());
+        $this->assertSame(7, $found->loginCount());
+        $this->assertSame(42, $found->lastReadBookId());
     }
 
     public function testDuplicateEmailThrowsException(): void

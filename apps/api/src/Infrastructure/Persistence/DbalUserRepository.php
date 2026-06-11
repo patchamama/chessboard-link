@@ -28,9 +28,20 @@ final class DbalUserRepository implements UserRepository
                 'role'                  => $user->role()->value,
                 'registration_status'   => $user->status()->value,
                 'created_at'            => $user->createdAt()->format('Y-m-d H:i:s'),
+                'login_count'           => $user->loginCount(),
+                'last_read_book_id'     => $user->lastReadBookId(),
             ]);
             $id = (int) $this->connection->lastInsertId();
-            return new User(new UserId($id), $user->email(), $user->passwordHash(), $user->role(), $user->status(), $user->createdAt());
+            return new User(
+                new UserId($id),
+                $user->email(),
+                $user->passwordHash(),
+                $user->role(),
+                $user->status(),
+                $user->createdAt(),
+                $user->loginCount(),
+                $user->lastReadBookId(),
+            );
         }
 
         // UPDATE
@@ -40,6 +51,8 @@ final class DbalUserRepository implements UserRepository
             'role'                => $user->role()->value,
             'registration_status' => $user->status()->value,
             'created_at'          => $user->createdAt()->format('Y-m-d H:i:s'),
+            'login_count'         => $user->loginCount(),
+            'last_read_book_id'   => $user->lastReadBookId(),
         ], ['id' => $user->id()->value()]);
 
         return $user;
@@ -74,6 +87,24 @@ final class DbalUserRepository implements UserRepository
         return array_map($this->hydrate(...), $rows);
     }
 
+    public function findAllApproved(): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT * FROM users WHERE registration_status = 'approved'"
+        );
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
+    public function findAllRejected(): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT * FROM users WHERE registration_status = 'rejected'"
+        );
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
     private function hydrate(array $row): User
     {
         return new User(
@@ -83,6 +114,10 @@ final class DbalUserRepository implements UserRepository
             Role::from($row['role']),
             RegistrationStatus::from($row['registration_status']),
             new DateTimeImmutable($row['created_at']),
+            (int) ($row['login_count'] ?? 0),
+            isset($row['last_read_book_id']) && $row['last_read_book_id'] !== null
+                ? (int) $row['last_read_book_id']
+                : null,
         );
     }
 }

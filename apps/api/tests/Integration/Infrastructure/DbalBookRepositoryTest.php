@@ -65,6 +65,38 @@ class DbalBookRepositoryTest extends TestCase
         $this->assertNull($this->repo->findById(9999));
     }
 
+    public function testSavePersistsAndHydratesDescriptionRoundTrip(): void
+    {
+        $book = new Book(0, 1, 'Chess Tactics', 'Nezhmetdinov', BookStatus::Ready, '2024-01-01 00:00:00', 'A great tactics book');
+        $id   = $this->repo->save($book);
+
+        $found = $this->repo->findById($id);
+        $this->assertNotNull($found);
+        $this->assertSame('A great tactics book', $found->description);
+    }
+
+    public function testUpdateModifiesAllFields(): void
+    {
+        $id = $this->repo->save(new Book(0, 1, 'Old Title', 'Old Author', BookStatus::Ready, '2024-01-01 00:00:00', 'Old desc'));
+
+        $this->repo->update($id, 'New Title', 'New Author', 'New description');
+
+        $found = $this->repo->findById($id);
+        $this->assertSame('New Title', $found->title);
+        $this->assertSame('New Author', $found->author);
+        $this->assertSame('New description', $found->description);
+    }
+
+    public function testFindByOwnerReturnsAllBooksForOwner(): void
+    {
+        $this->repo->save(new Book(0, 10, 'Book A', 'Auth', BookStatus::Ready, '2024-01-01 00:00:00'));
+        $this->repo->save(new Book(0, 10, 'Book B', 'Auth', BookStatus::Uploaded, '2024-01-02 00:00:00'));
+        $this->repo->save(new Book(0, 99, 'Other', 'Auth', BookStatus::Ready, '2024-01-03 00:00:00'));
+
+        $result = $this->repo->findByOwner(10);
+        $this->assertCount(2, $result);
+    }
+
     public function testSaveAndFindChapters(): void
     {
         $bookId = $this->repo->save(new Book(0, 6, 'With Chapters', 'Auth', BookStatus::Ready, '2024-01-01 00:00:00'));

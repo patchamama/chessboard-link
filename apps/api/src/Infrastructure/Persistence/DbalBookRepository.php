@@ -36,22 +36,42 @@ final class DbalBookRepository implements BookRepository
     {
         if ($book->id === 0) {
             $this->connection->insert('books', [
-                'owner_id'   => $book->ownerId,
-                'title'      => $book->title,
-                'author'     => $book->author,
-                'status'     => $book->status->value,
-                'created_at' => $book->createdAt,
+                'owner_id'    => $book->ownerId,
+                'title'       => $book->title,
+                'author'      => $book->author,
+                'status'      => $book->status->value,
+                'created_at'  => $book->createdAt,
+                'description' => $book->description,
             ]);
             return (int) $this->connection->lastInsertId();
         }
 
         $this->connection->update('books', [
-            'title'      => $book->title,
-            'author'     => $book->author,
-            'status'     => $book->status->value,
+            'title'       => $book->title,
+            'author'      => $book->author,
+            'status'      => $book->status->value,
+            'description' => $book->description,
         ], ['id' => $book->id]);
 
         return $book->id;
+    }
+
+    public function update(int $id, string $title, string $author, string $description): void
+    {
+        $this->connection->update('books', [
+            'title'       => $title,
+            'author'      => $author,
+            'description' => $description,
+        ], ['id' => $id]);
+    }
+
+    public function findByOwner(int $ownerId): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT * FROM books WHERE owner_id = ? ORDER BY created_at DESC',
+            [$ownerId],
+        );
+        return array_map($this->hydrate(...), $rows);
     }
 
     public function findChaptersByBook(int $bookId): array
@@ -86,12 +106,13 @@ final class DbalBookRepository implements BookRepository
     private function hydrate(array $row): Book
     {
         return new Book(
-            id:        (int) $row['id'],
-            ownerId:   (int) $row['owner_id'],
-            title:     (string) $row['title'],
-            author:    (string) $row['author'],
-            status:    BookStatus::from($row['status']),
-            createdAt: (string) $row['created_at'],
+            id:          (int) $row['id'],
+            ownerId:     (int) $row['owner_id'],
+            title:       (string) $row['title'],
+            author:      (string) $row['author'],
+            status:      BookStatus::from($row['status']),
+            createdAt:   (string) $row['created_at'],
+            description: (string) ($row['description'] ?? ''),
         );
     }
 
