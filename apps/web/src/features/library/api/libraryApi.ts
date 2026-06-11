@@ -6,6 +6,7 @@ export interface Book {
   title: string
   author: string
   createdAt: string
+  description: string
 }
 
 export interface ChapterTocEntry {
@@ -41,6 +42,25 @@ export interface UploadInput {
 export interface UploadResult {
   bookId: number
   status: string
+}
+
+export function useUpdateBook() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, title, author, description }: { id: number; title: string; author: string; description: string }) =>
+      httpClient<Book>(`/api/library/books/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title, author, description }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library', 'books'] }),
+  })
+}
+
+export function useTouchBook() {
+  return useMutation({
+    mutationFn: (bookId: number) =>
+      httpClient(`/api/library/books/${bookId}/touch`, { method: 'POST' }),
+  })
 }
 
 export function useUploadBook() {

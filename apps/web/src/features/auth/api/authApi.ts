@@ -47,6 +47,21 @@ export function useRegisterMutation() {
   })
 }
 
+interface ConfirmResetInput {
+  token: string
+  password: string
+}
+
+export function useConfirmPasswordReset() {
+  return useMutation({
+    mutationFn: (input: ConfirmResetInput) =>
+      httpClient('/api/auth/password-reset/confirm', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  })
+}
+
 export function useLoginMutation() {
   const { setSession } = useAuthStore()
   const navigate = useNavigate()
