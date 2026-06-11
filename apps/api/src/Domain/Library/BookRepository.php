@@ -11,6 +11,11 @@ interface BookRepository
 
     public function findById(int $id): ?Book;
 
+    /** @return Book[] */
+    public function findByOwner(int $ownerId): array;
+
+    public function update(int $id, string $title, string $author, string $description): void;
+
     public function save(Book $book): int;
 
     public function saveChapter(int $bookId, int $order, string $title, string $html): int;

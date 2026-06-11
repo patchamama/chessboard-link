@@ -6,7 +6,7 @@ namespace App\Infrastructure\Persistence;
 
 use Doctrine\DBAL\Connection;
 
-final class UserMetricsReadModel
+class UserMetricsReadModel
 {
     public function __construct(private readonly Connection $connection)
     {

@@ -68,8 +68,10 @@ class LoginHandlerTest extends TestCase
 
     public function testApprovedUserWithCorrectPasswordReturnsToken(): void
     {
+        $user = $this->makeUser(RegistrationStatus::Approved);
         $repo = $this->createMock(UserRepository::class);
-        $repo->method('findByEmail')->willReturn($this->makeUser(RegistrationStatus::Approved));
+        $repo->method('findByEmail')->willReturn($user);
+        $repo->method('save')->willReturn($user->withLoginCount(1));
         $hasher = $this->createMock(PasswordHasher::class);
         $hasher->method('verify')->willReturn(true);
         $issuer = $this->createMock(TokenIssuer::class);
@@ -88,5 +90,51 @@ class LoginHandlerTest extends TestCase
 
         $this->expectException(InvalidCredentialsException::class);
         (new LoginHandler($repo, $hasher, $issuer))->handle(new LoginCommand('ghost@test.com', 'pw'));
+    }
+
+    public function testSuccessfulLoginIncrementsLoginCount(): void
+    {
+        $user = new User(
+            new UserId(1),
+            'alice@test.com',
+            'correct_hash',
+            Role::User,
+            RegistrationStatus::Approved,
+            new DateTimeImmutable(),
+            loginCount: 3,
+        );
+
+        $savedUser = $user->withLoginCount(4);
+
+        $repo = $this->createMock(UserRepository::class);
+        $repo->method('findByEmail')->willReturn($user);
+        $repo->expects($this->once())
+            ->method('save')
+            ->with($this->callback(fn($u) => $u->loginCount() === 4))
+            ->willReturn($savedUser);
+
+        $hasher = $this->createMock(PasswordHasher::class);
+        $hasher->method('verify')->willReturn(true);
+        $issuer = $this->createMock(TokenIssuer::class);
+        $issuer->method('issue')->willReturn('token');
+
+        (new LoginHandler($repo, $hasher, $issuer))->handle(new LoginCommand('alice@test.com', 'correct'));
+    }
+
+    public function testFailedLoginDoesNotIncrementLoginCount(): void
+    {
+        $repo = $this->createMock(UserRepository::class);
+        $repo->method('findByEmail')->willReturn($this->makeUser(RegistrationStatus::Approved));
+        $repo->expects($this->never())->method('save');
+
+        $hasher = $this->createMock(PasswordHasher::class);
+        $hasher->method('verify')->willReturn(false);
+        $issuer = $this->createMock(TokenIssuer::class);
+
+        try {
+            (new LoginHandler($repo, $hasher, $issuer))->handle(new LoginCommand('alice@test.com', 'wrong'));
+        } catch (InvalidCredentialsException) {
+            // expected
+        }
     }
 }

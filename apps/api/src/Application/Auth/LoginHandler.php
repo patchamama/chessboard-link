@@ -37,6 +37,8 @@ final class LoginHandler
             throw new InvalidCredentialsException();
         }
 
+        $user = $this->repository->save($user->withLoginCount($user->loginCount() + 1));
+
         return $this->issuer->issue($user);
     }
 }
