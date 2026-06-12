@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import BookCard from '../components/BookCard'
 
-const book = { id: 7, title: 'Chess Openings', author: 'Fischer', createdAt: '2024-01-01' }
+const book = { id: 7, title: 'Chess Openings', author: 'Fischer', createdAt: '2024-01-01', description: '' }
 
 describe('BookCard', () => {
   it('shows title and author', () => {

@@ -18,7 +18,6 @@ import {
   useSetUserPassword,
   useSendResetLink,
   useApproveUser,
-  useRejectUser,
 } from '../adminApi'
 
 const mockHttp = vi.mocked(httpClient)
@@ -33,7 +32,7 @@ describe('adminApi — new hooks', () => {
 
   it('useActiveUsers uses queryKey [admin, active-users]', async () => {
     mockHttp.mockResolvedValue({ users: [] })
-    const { result } = renderHook(() => useActiveUsers(), { wrapper })
+    renderHook(() => useActiveUsers(), { wrapper })
     await act(async () => {})
     expect(mockHttp).toHaveBeenCalledWith(
       '/api/admin/active-users',
@@ -43,7 +42,7 @@ describe('adminApi — new hooks', () => {
 
   it('useBlockedUsers uses queryKey [admin, blocked-users]', async () => {
     mockHttp.mockResolvedValue({ users: [] })
-    const { result } = renderHook(() => useBlockedUsers(), { wrapper })
+    renderHook(() => useBlockedUsers(), { wrapper })
     await act(async () => {})
     expect(mockHttp).toHaveBeenCalledWith(
       '/api/admin/blocked-users',
@@ -53,14 +52,14 @@ describe('adminApi — new hooks', () => {
 
   it('useUserBooks is disabled when no id provided', async () => {
     mockHttp.mockResolvedValue({ books: [] })
-    const { result } = renderHook(() => useUserBooks(undefined), { wrapper })
+    renderHook(() => useUserBooks(undefined), { wrapper })
     await act(async () => {})
     expect(mockHttp).not.toHaveBeenCalled()
   })
 
   it('useUserBooks fetches when id provided', async () => {
     mockHttp.mockResolvedValue({ books: [] })
-    const { result } = renderHook(() => useUserBooks(42), { wrapper })
+    renderHook(() => useUserBooks(42), { wrapper })
     await act(async () => {})
     expect(mockHttp).toHaveBeenCalledWith(
       '/api/admin/users/42/books',

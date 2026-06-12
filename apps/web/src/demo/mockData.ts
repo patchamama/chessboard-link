@@ -7,18 +7,21 @@ export const MOCK_BOOKS: Book[] = [
     title: 'My System',
     author: 'Nimzowitsch, Aaron',
     createdAt: '2024-01-10T10:00:00Z',
+    description: '',
   },
   {
     id: 2,
     title: 'Chess Fundamentals',
     author: 'Capablanca, Jose Raul',
     createdAt: '2024-02-14T09:30:00Z',
+    description: '',
   },
   {
     id: 3,
     title: 'Think Like a Grandmaster',
     author: 'Kotov, Alexander',
     createdAt: '2024-03-05T14:00:00Z',
+    description: '',
   },
 ]
 

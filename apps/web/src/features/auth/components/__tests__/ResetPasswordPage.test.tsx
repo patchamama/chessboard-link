@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -50,7 +49,6 @@ describe('ResetPasswordPage', () => {
   })
 
   it('on error (400) shows error message', async () => {
-    const { ApiError } = await import('../../../../shared/api/httpClient') as any
     mockConfirmReset.mockRejectedValue(new Error('Invalid or expired reset token.'))
     renderWithToken('badtoken')
     fireEvent.change(screen.getByPlaceholderText(/new password/i), { target: { value: 'AnyPass1!' } })

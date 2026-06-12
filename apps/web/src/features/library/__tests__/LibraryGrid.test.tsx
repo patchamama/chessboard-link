@@ -67,8 +67,8 @@ describe('LibraryGrid', () => {
 
   it('renders BookCards from query data', () => {
     const books = [
-      { id: 1, title: 'Chess Fundamentals', author: 'Capablanca', createdAt: '2024-01-01' },
-      { id: 2, title: 'My System', author: 'Nimzowitsch', createdAt: '2024-01-02' },
+      { id: 1, title: 'Chess Fundamentals', author: 'Capablanca', createdAt: '2024-01-01', description: '' },
+      { id: 2, title: 'My System', author: 'Nimzowitsch', createdAt: '2024-01-02', description: '' },
     ]
     mockUseBooks.mockReturnValue(makeQuery({ isLoading: false, isSuccess: true, data: books }))
     render(<MemoryRouter><LibraryGrid /></MemoryRouter>)
