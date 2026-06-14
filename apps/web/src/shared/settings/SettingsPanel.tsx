@@ -1,4 +1,4 @@
-import { useSettingsStore, BOARD_THEMES, FONT_FAMILIES, STOCKFISH_VERSIONS, type BoardTheme, type FontFamily, type EvalBarDirection, type StockfishVersion, type ImageAlign, type HeadingStyle } from './settingsStore'
+import { useSettingsStore, BOARD_THEMES, FONT_FAMILIES, STOCKFISH_VERSIONS, type BoardTheme, type FontFamily, type EvalBarDirection, type StockfishVersion, type ImageAlign, type HeadingStyle, type EngineVariations } from './settingsStore'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -6,6 +6,53 @@ interface SettingsPanelProps {
 
 const labelClass = 'block text-xs font-semibold text-gray-300 mb-1 mt-3'
 const inputClass = 'w-full rounded bg-gray-700 border border-gray-600 px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400'
+
+const stepBtn =
+  'flex h-7 w-7 items-center justify-center rounded border border-gray-600 bg-gray-700 text-white hover:border-amber-400 disabled:opacity-40 disabled:cursor-not-allowed'
+
+/** −/+ stepper row with a centred value. */
+function Stepper({
+  value,
+  onDec,
+  onInc,
+  decLabel,
+  incLabel,
+  canDec = true,
+  canInc = true,
+}: {
+  value: string | number
+  onDec: () => void
+  onInc: () => void
+  decLabel: string
+  incLabel: string
+  canDec?: boolean
+  canInc?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button className={stepBtn} aria-label={decLabel} onClick={onDec} disabled={!canDec}>−</button>
+      <span className="min-w-8 text-center text-sm font-semibold text-white">{value}</span>
+      <button className={stepBtn} aria-label={incLabel} onClick={onInc} disabled={!canInc}>+</button>
+    </div>
+  )
+}
+
+/** On/off pill toggle. */
+function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex-1 rounded py-1 text-xs border transition-colors ${
+        on
+          ? 'bg-amber-400 text-gray-900 border-amber-400 font-semibold'
+          : 'bg-gray-700 text-gray-200 border-gray-600 hover:border-amber-400'
+      }`}
+    >
+      {label}: {on ? 'On' : 'Off'}
+    </button>
+  )
+}
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const s = useSettingsStore()
@@ -75,6 +122,55 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
             <option key={key} value={key}>{v.label}</option>
           ))}
         </select>
+
+        {/* ── Engine ── */}
+        <div className="mt-4 border-t border-gray-700 pt-3">
+          <p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Engine</p>
+
+          <label className={labelClass}>Evaluation</label>
+          <div className="flex gap-2">
+            <Toggle
+              on={s.showEval}
+              onClick={() => s.set({ showEval: !s.showEval })}
+              label="Show evaluation"
+            />
+          </div>
+
+          <label className={labelClass}>Depth (plies)</label>
+          <Stepper
+            value={s.engineDepth}
+            decLabel="Decrease depth"
+            incLabel="Increase depth"
+            canDec={s.engineDepth > 1}
+            canInc={s.engineDepth < 40}
+            onDec={() => s.set({ engineDepth: Math.max(1, s.engineDepth - 1) })}
+            onInc={() => s.set({ engineDepth: Math.min(40, s.engineDepth + 1) })}
+          />
+
+          <label className={labelClass}>Variations (max 3)</label>
+          <Stepper
+            value={s.engineVariations}
+            decLabel="Decrease variations"
+            incLabel="Increase variations"
+            canDec={s.engineVariations > 1}
+            canInc={s.engineVariations < 3}
+            onDec={() =>
+              s.set({ engineVariations: Math.max(1, s.engineVariations - 1) as EngineVariations })
+            }
+            onInc={() =>
+              s.set({ engineVariations: Math.min(3, s.engineVariations + 1) as EngineVariations })
+            }
+          />
+
+          <label className={labelClass}>Engine arrow</label>
+          <div className="flex gap-2">
+            <Toggle
+              on={s.hideEngineArrow}
+              onClick={() => s.set({ hideEngineArrow: !s.hideEngineArrow })}
+              label="Hide engine move arrow"
+            />
+          </div>
+        </div>
 
         {/* Font family */}
         <label className={labelClass}>Font family</label>

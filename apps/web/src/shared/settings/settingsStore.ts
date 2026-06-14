@@ -68,10 +68,20 @@ export interface EpubLayout {
   imageAlign: ImageAlign
 }
 
+export type EngineVariations = 1 | 2 | 3
+
 export interface AppSettings {
   boardTheme: BoardTheme
   evalBarDirection: EvalBarDirection
   stockfishVersion: StockfishVersion
+  /** Master switch: ON → engine runs, eval panel + best-move arrow shown. */
+  showEval: boolean
+  /** Target search depth (plies). Progressive analysis ramps up to this value. */
+  engineDepth: number
+  /** Number of principal variations to compute (MultiPV), 1–3. */
+  engineVariations: EngineVariations
+  /** Hide the engine best-move arrow even while the engine is active. */
+  hideEngineArrow: boolean
   fontFamily: FontFamily
   fontSize: number        // 12–22 px
   bgColor: string         // hex
@@ -95,6 +105,10 @@ const DEFAULT: AppSettings = {
   boardTheme: 'blue',
   evalBarDirection: 'vertical',
   stockfishVersion: 'sf10-jsdelivr',
+  showEval: true,
+  engineDepth: 30,
+  engineVariations: 1,
+  hideEngineArrow: false,
   fontFamily: 'serif',
   fontSize: 16,
   bgColor: '#ffffff',

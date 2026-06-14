@@ -12,7 +12,7 @@ export interface EvalResult {
 
 const evalCache = new Map<string, Omit<EvalResult, 'loading'>>()
 
-export function useStockfishEval(fen: string): EvalResult {
+export function useStockfishEval(fen: string, enabled = true): EvalResult {
   const stockfishVersion = useSettingsStore((s) => s.stockfishVersion)
   const sfUrl = STOCKFISH_VERSIONS[stockfishVersion].url
 
@@ -24,12 +24,14 @@ export function useStockfishEval(fen: string): EvalResult {
   const workerRef = useRef<Worker | null>(null)
   const fenRef    = useRef<string>(fen)
 
-  // Recreate worker when sfUrl changes
+  // Recreate worker when sfUrl changes (skip entirely when disabled — used when
+  // an external score, e.g. the engine panel, already drives the bar).
   useEffect(() => {
     if (workerRef.current) {
       workerRef.current.terminate()
       workerRef.current = null
     }
+    if (!enabled) return
     evalCache.clear()
 
     const worker = createStockfishWorker(sfUrl)
@@ -55,7 +57,7 @@ export function useStockfishEval(fen: string): EvalResult {
       worker.terminate()
       workerRef.current = null
     }
-  }, [sfUrl])
+  }, [sfUrl, enabled])
 
   useEffect(() => {
     fenRef.current = fen

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Chess } from 'chess.js'
 import ChessBoard from '../../../shared/chess/ChessBoard'
 import EvalBar from '../../viewer/components/EvalBar'
@@ -9,8 +9,55 @@ import { MoveStatusRow } from './TurnIndicator'
 import { AnnotationToolbar } from './AnnotationToolbar'
 import { PenCanvas } from './PenCanvas'
 import { VariationChooser } from './VariationChooser'
+import { EngineEvalPanel } from './EngineEvalPanel'
+import { useEngineLines } from '../../../shared/stockfish/useEngineLines'
+import { buildBoardArrows, ENGINE_ARROW_COLOR, PREMOVE_ARROW_COLOR } from '../utils/engineArrows'
+import type { Arrow } from 'react-chessboard'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+/**
+ * Return a FEN with `piece` placed on `square`, overlaying the given position.
+ * Used for isolated prose moves: the colour alternates (white = uppercase) so
+ * the reader sees that the side to move is unspecified. Falls back to the
+ * original FEN if anything fails.
+ */
+function placePiece(
+  fen: string,
+  square: string,
+  piece: 'p' | 'n' | 'b' | 'r' | 'q' | 'k',
+  white: boolean,
+): string {
+  try {
+    const [placement, ...rest] = fen.split(' ')
+    const ranks = placement.split('/')
+    const file = square.charCodeAt(0) - 97 // a..h → 0..7
+    const rank = 8 - parseInt(square[1], 10) // '8'..'1' → row 0..7
+    if (file < 0 || file > 7 || rank < 0 || rank > 7) return fen
+    // Expand the target rank into 8 single-cell slots.
+    const cells: string[] = []
+    for (const ch of ranks[rank]) {
+      if (/\d/.test(ch)) for (let i = 0; i < Number(ch); i++) cells.push('')
+      else cells.push(ch)
+    }
+    cells[file] = white ? piece.toUpperCase() : piece
+    // Re-collapse empty runs back into digits.
+    let out = ''
+    let empty = 0
+    for (const c of cells) {
+      if (c === '') empty++
+      else {
+        if (empty) { out += String(empty); empty = 0 }
+        out += c
+      }
+    }
+    if (empty) out += String(empty)
+    ranks[rank] = out
+    return [ranks.join('/'), ...rest].join(' ')
+  } catch {
+    return fen
+  }
+}
 
 function NavButton({
   onClick,
@@ -37,6 +84,8 @@ function NavButton({
 
 export function StudyBoard() {
   const evalDirection = useSettingsStore((s) => s.evalBarDirection)
+  const showEval = useSettingsStore((s) => s.showEval)
+  const hideEngineArrow = useSettingsStore((s) => s.hideEngineArrow)
 
   const activeGame = useStudyBoardStore((s) => s.activeGame)
   const orientation = useStudyBoardStore((s) => s.orientation)
@@ -54,15 +103,82 @@ export function StudyBoard() {
   const legalTargets = useStudyBoardStore((s) => s.legalTargets)
   const selectSquare = useStudyBoardStore((s) => s.selectSquare)
   const playMove = useStudyBoardStore((s) => s.playMove)
+  const isolatedHighlight = useStudyBoardStore((s) => s.isolatedHighlight)
 
   const nav = useStudyNavigation()
   const [showChooser, setShowChooser] = useState(false)
   const [fenInput, setFenInput] = useState(INITIAL_FEN)
 
+  // An isolated move only overlays a PIECE when the notation names one (Nb5, Bf3).
+  // A bare pawn move (e4, d5) specifies no piece, so we only highlight the square
+  // — no pawn is placed on the board.
+  const overlayPiece = !!isolatedHighlight && isolatedHighlight.piece !== 'p'
+
+  // Alternating colour (white/black) for the isolated-move overlay piece.
+  const [isoWhite, setIsoWhite] = useState(true)
+  useEffect(() => {
+    if (!overlayPiece) return
+    setIsoWhite(true)
+    const t = window.setInterval(() => setIsoWhite((w) => !w), 700)
+    return () => window.clearInterval(t)
+  }, [overlayPiece, isolatedHighlight])
+
   // The navigation/base position (game-driven or manual FEN).
   const baseFen = activeGame ? nav.fen : fenInput
   // The displayed position: a free-play position takes precedence once the user moves.
-  const fen = playFen ?? baseFen
+  // An isolated piece-move overlays its alternating piece on top of the current FEN.
+  const fen =
+    isolatedHighlight && overlayPiece
+      ? placePiece(playFen ?? baseFen, isolatedHighlight.square, isolatedHighlight.piece, isoWhite)
+      : playFen ?? baseFen
+
+  // Single engine instance for the whole board: drives the eval panel AND the
+  // best-move arrow. Internally gated by the `showEval` setting (no worker when off).
+  const engine = useEngineLines(fen)
+
+  // The tree's next move (premove arrow when the engine is off).
+  const nextMove =
+    !playFen && activeGame && nav.successorId
+      ? (() => {
+          const succ = activeGame.nodes.get(nav.successorId)
+          return succ && succ.from ? { from: succ.from, to: succ.to } : null
+        })()
+      : null
+
+  // While the engine panel is active, feed its live score into the eval bar so
+  // both stay in sync (and only one worker runs). null → bar uses its own worker.
+  const engineBest = engine.lines[0]
+  const evalBarScore =
+    showEval && engineBest
+      ? { scoreCp: engineBest.scoreCp, mate: engineBest.mate, loading: engine.loading }
+      : null
+
+  const boardArrows = buildBoardArrows({
+    userArrows: annotations.arrows,
+    showEval,
+    hideEngineArrow,
+    bestMoveUci: engine.bestMove,
+    nextMove,
+  })
+
+  // Keyboard navigation: ← / → step through the position shown on the board.
+  // Only active while a game is loaded; ignores typing in inputs.
+  useEffect(() => {
+    if (!activeGame) return
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (nav.canNext) nav.next()
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (nav.canPrev) nav.prev()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeGame, nav])
 
   // Autoplay loop.
   useEffect(() => {
@@ -86,9 +202,24 @@ export function StudyBoard() {
     nav.next()
   }
 
-  const highlightStyles = Object.fromEntries(
+  const highlightStyles: Record<string, CSSProperties> = Object.fromEntries(
     Object.entries(annotations.highlights).map(([sq, color]) => [sq, { backgroundColor: color }]),
   )
+  if (isolatedHighlight) {
+    highlightStyles[isolatedHighlight.square] = {
+      ...highlightStyles[isolatedHighlight.square],
+      backgroundColor: 'rgba(250, 204, 21, 0.55)',
+      boxShadow: 'inset 0 0 0 3px rgba(202, 138, 4, 0.9)',
+    }
+  }
+
+  // react-chessboard reports ALL arrows (including our auto engine/premove ones)
+  // when the user draws. Strip the auto arrows so only real annotations persist.
+  const onUserArrowsChange = (arrows: Arrow[]) => {
+    setArrows(
+      arrows.filter((a) => a.color !== ENGINE_ARROW_COLOR && a.color !== PREMOVE_ARROW_COLOR),
+    )
+  }
 
   const onSquareClick = (square: string) => {
     if (toolMode === 'highlight') toggleHighlight(square)
@@ -114,9 +245,9 @@ export function StudyBoard() {
         fen={fen}
         orientation={orientation}
         lastMove={!playFen && activeGame ? nav.lastMove : null}
-        arrows={annotations.arrows}
+        arrows={boardArrows}
         allowDrawingArrows={toolMode === 'arrows'}
-        onArrowsChange={setArrows}
+        onArrowsChange={onUserArrowsChange}
         customSquareStyles={highlightStyles}
         onSquareClick={onSquareClick}
         allowDragging={playMode}
@@ -132,6 +263,16 @@ export function StudyBoard() {
   // show whose turn it is from the live position.
   const statusRow = <MoveStatusRow fen={fen} node={!playFen && activeGame ? nav.node : null} />
 
+  // Play an engine PV move (UCI) on the board. Splitting from/to lets us reuse
+  // the click-to-move machinery; the new position re-runs the engine.
+  const playUci = (uci: string) => {
+    playMove(uci.slice(0, 2), uci.slice(2, 4), baseFen)
+  }
+
+  const evalPanel = showEval ? (
+    <EngineEvalPanel fen={fen} onPlayUci={playUci} engine={engine} />
+  ) : null
+
   return (
     <div className="flex flex-col gap-3">
       <p className="shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">Study Board</p>
@@ -140,16 +281,18 @@ export function StudyBoard() {
       {evalDirection === 'vertical' ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-stretch gap-1">
-            <EvalBar fen={fen} direction="vertical" />
+            <EvalBar fen={fen} direction="vertical" score={evalBarScore} />
             <div className="flex-1">{boardWrapper}</div>
           </div>
           {statusRow}
+          {evalPanel}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {boardWrapper}
-          <EvalBar fen={fen} direction="horizontal" />
+          <EvalBar fen={fen} direction="horizontal" score={evalBarScore} />
           {statusRow}
+          {evalPanel}
         </div>
       )}
 

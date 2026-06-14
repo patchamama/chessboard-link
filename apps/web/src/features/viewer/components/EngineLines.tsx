@@ -72,7 +72,7 @@ function fenAfterMoves(fen: string, pv: string[], upTo: number): string | null {
 }
 
 export default function EngineLines({ fen, onPreviewFen }: EngineLinesProps) {
-  const { lines, loading } = useEngineLines(fen, 5)
+  const { lines, loading } = useEngineLines(fen)
 
   if (loading && lines.length === 0) {
     return <span className="text-[11px] opacity-40 italic">SF10 · ...</span>

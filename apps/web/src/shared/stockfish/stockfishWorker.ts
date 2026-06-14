@@ -10,7 +10,9 @@
  *   OUT { type: 'eval', fen, scoreCp?, mate?, bestMove?, depth }
  *
  *   IN  { type: 'lines', fen, depth?, count? }
- *   OUT { type: 'lines', fen, lines: [{idx, pv, scoreCp?, mate?, depth}] }
+ *   OUT { type: 'lines', fen, lines: [{idx, pv, scoreCp?, mate?, depth, nodes?, nps?, time?}], final }
+ *        — streamed: one message per completed depth (progressive analysis),
+ *          plus a final message (final:true) when `bestmove` arrives.
  */
 
 export const SF_DEFAULT_URL = 'https://cdn.jsdelivr.net/npm/stockfish.js@10/stockfish.js'
@@ -26,17 +28,30 @@ let currentFen    = null;
 let currentDepth  = 15;
 let currentMode   = 'evaluate';
 let currentCount  = 5;
+let lastEmitDepth = 0;      // last depth streamed to the app (lines mode)
+let lastEmitAt    = 0;      // timestamp (ms) of the last streamed emit
+const EMIT_THROTTLE_MS = 60;
 const pvMap       = new Map();
 
 function send(cmd) { if (sf) sf.postMessage(cmd); }
 
 function analyze() {
   pvMap.clear();
+  lastEmitDepth = 0;
+  lastEmitAt = 0;
   send('stop');
   send('setoption name MultiPV value ' + (currentMode === 'lines' ? currentCount : 1));
   send('ucinewgame');
   send('position fen ' + currentFen);
   send('go depth ' + currentDepth);
+}
+
+// Emit the current MultiPV set as a 'lines' message. final=true marks the
+// message produced when the engine reports bestmove (target depth reached).
+function emitLines(final) {
+  if (pvMap.size === 0) return;
+  const lines = Array.from(pvMap.values()).sort((a, b) => a.idx - b.idx);
+  self.postMessage({ type: 'lines', fen: currentFen, lines: lines, final: final });
 }
 
 function attachSf(worker) {
@@ -60,11 +75,8 @@ function attachSf(worker) {
     }
 
     if (line.startsWith('bestmove')) {
-      if (currentMode === 'lines' && pvMap.size > 0) {
-        const lines = Array.from(pvMap.values()).sort((a, b) => a.idx - b.idx);
-        self.postMessage({ type: 'lines', fen: currentFen, lines });
-        pvMap.clear();
-      }
+      if (currentMode === 'lines') emitLines(true);
+      pvMap.clear();
       return;
     }
 
@@ -75,6 +87,9 @@ function attachSf(worker) {
     const mateM  = line.match(/\\bscore mate\\s+(-?\\d+)/);
     const pvM    = line.match(/\\bpv\\s+(.+)/);
     const mpvM   = line.match(/\\bmultipv\\s+(\\d+)/);
+    const nodesM = line.match(/\\bnodes\\s+(\\d+)/);
+    const npsM   = line.match(/\\bnps\\s+(\\d+)/);
+    const timeM  = line.match(/\\btime\\s+(\\d+)/);
     if (!depthM) return;
 
     const depth = parseInt(depthM[1]);
@@ -89,14 +104,29 @@ function attachSf(worker) {
         self.postMessage({ type: 'eval', fen: currentFen, scoreCp: parseInt(cpM[1]), bestMove, depth });
       }
     } else {
-      // Keep the entry with the longest pv seen so far for this multipv index.
-      // SF10 emits shorter pvs at high depths; we want the richest line available.
-      const existing = pvMap.get(idx);
-      if (!existing || pv.length >= existing.pv.length || depth >= existing.depth) {
-        const entry = { idx, pv, depth };
-        if (mateM) entry.mate = parseInt(mateM[1]);
-        if (cpM)   entry.scoreCp = parseInt(cpM[1]);
-        pvMap.set(idx, entry);
+      // A 'pv' is required: SF also emits bound-only score lines (upperbound/
+      // lowerbound) with no usable variation — skip those, they would blank the PV.
+      if (pv.length === 0) return;
+
+      const entry = { idx: idx, pv: pv, depth: depth };
+      if (mateM)  entry.mate    = parseInt(mateM[1]);
+      if (cpM)    entry.scoreCp = parseInt(cpM[1]);
+      if (nodesM) entry.nodes   = parseInt(nodesM[1]);
+      if (npsM)   entry.nps     = parseInt(npsM[1]);
+      if (timeM)  entry.time    = parseInt(timeM[1]);
+      pvMap.set(idx, entry);
+
+      // Progressive streaming: forward every refined score as it arrives so the
+      // bar/panel update live while depth ramps up. Emit once we have the full
+      // MultiPV set for this round (idx reached count), throttled to ~60ms to
+      // avoid flooding the main thread, but always emit on a new depth.
+      if (idx >= currentCount) {
+        const now = Date.now();
+        if (now - lastEmitAt >= EMIT_THROTTLE_MS || depth > lastEmitDepth) {
+          lastEmitAt = now;
+          lastEmitDepth = depth;
+          emitLines(false);
+        }
       }
     }
   };

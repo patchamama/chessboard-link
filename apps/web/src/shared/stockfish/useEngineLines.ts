@@ -8,64 +8,86 @@ export interface EngineLine {
   scoreCp?: number
   mate?: number
   depth: number
+  nodes?: number
+  nps?: number
+  time?: number
 }
 
-const linesCache = new Map<string, EngineLine[]>()
+export interface EngineLinesState {
+  lines: EngineLine[]
+  loading: boolean
+  /** depth of the latest streamed result */
+  depth: number
+  nodes?: number
+  nps?: number
+  time?: number
+  /** first UCI move of the principal variation (the engine best move) */
+  bestMove?: string
+}
 
-export function useEngineLines(fen: string, count = 5): { lines: EngineLine[]; loading: boolean } {
+const EMPTY: EngineLinesState = { lines: [], loading: false, depth: 0 }
+
+/** Derive the streamed metrics (depth/nodes/nps/time/bestMove) from line[0]. */
+function deriveState(lines: EngineLine[], loading: boolean): EngineLinesState {
+  const best = lines[0]
+  return {
+    lines,
+    loading,
+    depth: best?.depth ?? 0,
+    nodes: best?.nodes,
+    nps: best?.nps,
+    time: best?.time,
+    bestMove: best?.pv?.[0],
+  }
+}
+
+/**
+ * Progressive Stockfish analysis for `fen`. Runs only while the `showEval`
+ * setting is on; depth and variation count come from Settings. The worker
+ * streams a result per completed depth, so `state.depth` ramps up live.
+ */
+export function useEngineLines(fen: string): EngineLinesState {
   const stockfishVersion = useSettingsStore((s) => s.stockfishVersion)
+  const showEval = useSettingsStore((s) => s.showEval)
+  const depth = useSettingsStore((s) => s.engineDepth)
+  const count = useSettingsStore((s) => s.engineVariations)
   const sfUrl = STOCKFISH_VERSIONS[stockfishVersion].url
 
-  const [state, setState] = useState<{ lines: EngineLine[]; loading: boolean }>(() => {
-    const cached = linesCache.get(fen)
-    return cached ? { lines: cached, loading: false } : { lines: [], loading: true }
-  })
+  const [state, setState] = useState<EngineLinesState>(EMPTY)
 
   const workerRef = useRef<Worker | null>(null)
-  const fenRef    = useRef<string>(fen)
-  const sfUrlRef  = useRef<string>(sfUrl)
+  const fenRef = useRef<string>(fen)
 
-  // Recreate worker when sfUrl changes
+  // (Re)create the worker whenever the engine is enabled or its config changes.
+  // Depth/count are part of the request payload, so a change re-runs analysis.
   useEffect(() => {
-    if (workerRef.current) {
-      workerRef.current.terminate()
-      workerRef.current = null
+    fenRef.current = fen
+    if (!showEval) {
+      if (workerRef.current) {
+        workerRef.current.terminate()
+        workerRef.current = null
+      }
+      setState(EMPTY)
+      return
     }
-    sfUrlRef.current = sfUrl
-    linesCache.clear()
 
     const worker = createStockfishWorker(sfUrl)
     worker.onmessage = (e: MessageEvent) => {
       const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
       if (data.type !== 'lines') return
       if (data.fen !== fenRef.current) return
-      linesCache.set(data.fen, data.lines)
-      setState({ lines: data.lines, loading: false })
+      setState(deriveState(data.lines, !data.final))
     }
     workerRef.current = worker
 
-    setState({ lines: [], loading: true })
-    workerRef.current.postMessage({ type: 'lines', fen: fenRef.current, count, depth: 14 })
+    setState({ ...EMPTY, loading: true })
+    worker.postMessage({ type: 'lines', fen, depth, count })
 
     return () => {
       worker.terminate()
       workerRef.current = null
     }
-  }, [sfUrl, count])
-
-  useEffect(() => {
-    fenRef.current = fen
-    if (!workerRef.current) return
-
-    const cached = linesCache.get(fen)
-    if (cached) {
-      setState({ lines: cached, loading: false })
-      return
-    }
-
-    setState({ lines: [], loading: true })
-    workerRef.current.postMessage({ type: 'lines', fen, count, depth: 14 })
-  }, [fen, count])
+  }, [fen, sfUrl, showEval, depth, count])
 
   return state
 }

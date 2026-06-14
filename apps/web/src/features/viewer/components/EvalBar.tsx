@@ -1,9 +1,21 @@
 import { useStockfishEval } from '../../../shared/stockfish/useStockfishEval'
 import { useSettingsStore } from '../../../shared/settings/settingsStore'
 
+export interface SuppliedScore {
+  scoreCp?: number
+  mate?: number
+  loading?: boolean
+}
+
 interface EvalBarProps {
   fen: string
   direction?: 'horizontal' | 'vertical'
+  /**
+   * Externally supplied score (e.g. the live engine panel as its depth ramps up).
+   * When present, the bar uses it and does NOT spawn its own worker, so the bar
+   * and the panel stay in sync and only one engine runs.
+   */
+  score?: SuppliedScore | null
 }
 
 function formatEval(scoreCp?: number, mate?: number): string {
@@ -13,16 +25,25 @@ function formatEval(scoreCp?: number, mate?: number): string {
   return (pawns > 0 ? '+' : '') + pawns.toFixed(1)
 }
 
-export default function EvalBar({ fen, direction: directionProp }: EvalBarProps) {
-  const { loading, scoreCp, mate, depth } = useStockfishEval(fen)
+export default function EvalBar({ fen, direction: directionProp, score }: EvalBarProps) {
+  // When a score is supplied, disable the bar's own worker (the panel drives it).
+  const own = useStockfishEval(fen, !score)
+  const { loading, scoreCp, mate, depth } = score
+    ? { loading: score.loading ?? false, scoreCp: score.scoreCp, mate: score.mate, depth: undefined }
+    : own
   const directionStore = useSettingsStore((s) => s.evalBarDirection)
   const direction = directionProp ?? directionStore
 
-  const label   = loading ? '…' : formatEval(scoreCp, mate)
+  // A preliminary score is available the moment any cp/mate arrives, even while
+  // still loading (depth ramping). Show it; "…" only when there is no score yet.
+  const hasScore = scoreCp !== undefined || mate !== undefined
+  const pending  = loading && !hasScore
+
+  const label   = pending ? '…' : formatEval(scoreCp, mate)
   const isWhite = mate !== undefined ? mate > 0 : (scoreCp ?? 0) >= 0
 
   // white advantage percentage (0-100)
-  const whitePct = loading
+  const whitePct = pending
     ? 50
     : mate !== undefined
       ? (mate > 0 ? 85 : 15)
@@ -65,11 +86,11 @@ export default function EvalBar({ fen, direction: directionProp }: EvalBarProps)
       </div>
       <div className="flex justify-between items-center mt-0.5 px-0.5">
         <span className="text-[10px] font-mono font-semibold" style={{ color: 'inherit' }}>
-          {isWhite && !loading ? label : ''}
+          {isWhite && !pending ? label : ''}
         </span>
-        {loading && <span className="text-[10px] text-gray-400 animate-pulse">Stockfish…</span>}
+        {pending && <span className="text-[10px] text-gray-400 animate-pulse">Stockfish…</span>}
         <span className="text-[10px] font-mono font-semibold text-gray-500">
-          {!isWhite && !loading ? label : ''}
+          {!isWhite && !pending ? label : ''}
         </span>
       </div>
     </div>
