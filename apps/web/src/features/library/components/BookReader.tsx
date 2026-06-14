@@ -9,7 +9,7 @@ import { useKeyboardNavigation } from '../../viewer/hooks/useKeyboardNavigation'
 export default function BookReader() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = Number(bookId)
-  const { data, isLoading } = useChapter(id, 0)
+  const { data, isLoading } = useChapter(id, 1)
 
   const html      = data?.html ?? ''
   const plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
