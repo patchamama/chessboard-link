@@ -176,7 +176,7 @@ export default function BookReader() {
   )
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-50">
 
       {/* ── Sticky nav bar ── */}
       <nav className="sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur">
@@ -289,10 +289,10 @@ export default function BookReader() {
           )}
         </main>
 
-        {/* Study board pane — always mounted, visibility toggled */}
+        {/* Study board pane — sticky, always mounted, visibility toggled */}
         <aside
-          className={`shrink-0 flex flex-col gap-3 border-l border-slate-200 bg-white px-4 py-5 transition-all duration-200 ${
-            showStudy ? 'w-72 xl:w-88' : 'w-0 overflow-hidden px-0 py-0 border-0'
+          className={`shrink-0 flex flex-col gap-3 border-l border-slate-200 bg-white px-4 py-5 overflow-y-auto transition-all duration-200 ${
+            showStudy ? 'w-72 xl:w-80' : 'w-0 overflow-hidden px-0 py-0 border-0'
           }`}
         >
           {showStudy && (
