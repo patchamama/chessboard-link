@@ -9,7 +9,7 @@ import { VariationChooser } from './VariationChooser'
 import { useStudyBoardStore } from '../store/studyBoardStore'
 import { getProgress, saveProgress } from '../store/readingStore'
 import { useSettingsStore } from '../../../shared/settings/settingsStore'
-import { successorOf, hasAlternativesAhead } from '../utils/proseChess'
+import { successorOf, hasAlternativesAhead, variationLinesFrom } from '../utils/proseChess'
 
 interface ProseChooser {
   top: number
@@ -242,6 +242,7 @@ export default function BookReader() {
             span.addEventListener('click', (e) => {
               if (hasAlt) {
                 e.stopPropagation()
+                // The fork is AT this node: mainline successor vs. variation lines.
                 const successorId = successorOf(captured.tree, captured.node)
                 if (!successorId) return
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -250,7 +251,7 @@ export default function BookReader() {
                   left: rect.left,
                   tree: captured.tree,
                   successorId,
-                  siblingLines: captured.tree.variations.get(successorId) ?? [],
+                  siblingLines: variationLinesFrom(captured.tree, captured.node),
                 })
               } else {
                 loadStudyNode(captured.tree, captured.node)

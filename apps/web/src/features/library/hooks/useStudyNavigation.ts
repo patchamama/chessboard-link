@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import type { GameTree, GameNode } from '@chess-ebook/chess-shared'
 import { useStudyBoardStore } from '../store/studyBoardStore'
+import { variationLinesFrom } from '../utils/proseChess'
 
 const STANDARD_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -68,14 +69,15 @@ export function useStudyNavigation(): StudyNavResult {
     return idx >= 0 && idx < tree.mainline.length - 1 ? tree.mainline[idx + 1] : null
   }, [tree, currentNodeId, isInVariation])
 
-  // Variation lines that are alternatives to the successor (they replace it).
+  // Variation lines that branch FROM the current node — i.e. whose first move is
+  // a sibling of `successorId` (same parent = the current node). The fork happens
+  // AT the current node: the next move is either `successorId` or one of these.
   const siblingLines = useMemo<string[][]>(
-    () => (tree && successorId ? tree.variations.get(successorId) ?? [] : []),
-    [tree, successorId],
+    () => (tree && node ? variationLinesFrom(tree, node) : []),
+    [tree, node],
   )
 
-  // A fork exists whenever the successor has sibling variations — this holds
-  // both on the mainline AND inside an analysis line (don't gate on isInVariation).
+  // A fork exists whenever the current node has variation lines branching from it.
   const hasChoiceAhead = successorId !== null && siblingLines.length > 0
 
   const canNext = successorId !== null
