@@ -3,6 +3,7 @@ import { useSettingsStore } from '../../../shared/settings/settingsStore'
 
 interface EvalBarProps {
   fen: string
+  direction?: 'horizontal' | 'vertical'
 }
 
 function formatEval(scoreCp?: number, mate?: number): string {
@@ -12,9 +13,10 @@ function formatEval(scoreCp?: number, mate?: number): string {
   return (pawns > 0 ? '+' : '') + pawns.toFixed(1)
 }
 
-export default function EvalBar({ fen }: EvalBarProps) {
+export default function EvalBar({ fen, direction: directionProp }: EvalBarProps) {
   const { loading, scoreCp, mate, depth } = useStockfishEval(fen)
-  const direction = useSettingsStore((s) => s.evalBarDirection)
+  const directionStore = useSettingsStore((s) => s.evalBarDirection)
+  const direction = directionProp ?? directionStore
 
   const label   = loading ? '…' : formatEval(scoreCp, mate)
   const isWhite = mate !== undefined ? mate > 0 : (scoreCp ?? 0) >= 0

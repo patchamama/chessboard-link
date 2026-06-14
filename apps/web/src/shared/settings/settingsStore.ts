@@ -49,6 +49,25 @@ export const FONT_FAMILIES: Record<FontFamily, { css: string; label: string }> =
   mono:  { css: 'JetBrains Mono, Courier New, monospace', label: 'Monospace' },
 }
 
+export type ImageAlign = 'left' | 'center' | 'right'
+
+export interface HeadingStyle {
+  bold: boolean
+  italic: boolean
+  sizeDelta: number   // relative px offset from base font size (-4..+16)
+}
+
+export interface EpubLayout {
+  h1: HeadingStyle
+  h2: HeadingStyle
+  h3: HeadingStyle
+  h4: HeadingStyle
+  h5: HeadingStyle
+  paragraphSpacing: number   // rem between <p> tags (0–4)
+  paragraphIndent: number    // rem text-indent for first line (0–4)
+  imageAlign: ImageAlign
+}
+
 export interface AppSettings {
   boardTheme: BoardTheme
   evalBarDirection: EvalBarDirection
@@ -58,6 +77,18 @@ export interface AppSettings {
   bgColor: string         // hex
   textColor: string       // hex
   marginH: number         // horizontal padding rem (0–6)
+  epub: EpubLayout
+}
+
+const DEFAULT_EPUB: EpubLayout = {
+  h1: { bold: true,  italic: false, sizeDelta: 10 },
+  h2: { bold: true,  italic: false, sizeDelta: 6  },
+  h3: { bold: true,  italic: false, sizeDelta: 3  },
+  h4: { bold: true,  italic: false, sizeDelta: 1  },
+  h5: { bold: false, italic: true,  sizeDelta: 0  },
+  paragraphSpacing: 1,
+  paragraphIndent: 1.5,
+  imageAlign: 'center',
 }
 
 const DEFAULT: AppSettings = {
@@ -69,6 +100,7 @@ const DEFAULT: AppSettings = {
   bgColor: '#ffffff',
   textColor: '#1a1a1a',
   marginH: 2,
+  epub: DEFAULT_EPUB,
 }
 
 interface SettingsStore extends AppSettings {

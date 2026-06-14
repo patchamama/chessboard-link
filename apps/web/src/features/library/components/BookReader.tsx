@@ -9,6 +9,7 @@ import ChessBoard from '../../../shared/chess/ChessBoard'
 import EvalBar from '../../viewer/components/EvalBar'
 import { useViewerStore } from '../../viewer/store/viewerStore'
 import { getProgress, saveProgress } from '../store/readingStore'
+import { useSettingsStore } from '../../../shared/settings/settingsStore'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -41,6 +42,8 @@ export default function BookReader() {
   const studyFenFromStore = useViewerStore((s) => s.studyFen)
   const setStudyFen = useViewerStore((s) => s.setStudyFen)
   const studyFen = studyFenFromStore ?? INITIAL_FEN
+  const epub = useSettingsStore((s) => s.epub)
+  const fontSize = useSettingsStore((s) => s.fontSize)
   useEffect(() => {
     if (studyFenFromStore) setStudyInput(studyFenFromStore)
   }, [studyFenFromStore])
@@ -161,6 +164,25 @@ export default function BookReader() {
     }
   }
 
+  // Scoped CSS for EPUB rendering based on user settings
+  const epubCss = `
+    .epub-content h1 { font-weight: ${epub.h1.bold ? '700' : '400'}; font-style: ${epub.h1.italic ? 'italic' : 'normal'}; font-size: ${fontSize + epub.h1.sizeDelta}px; margin: 1.2em 0 0.4em; }
+    .epub-content h2 { font-weight: ${epub.h2.bold ? '700' : '400'}; font-style: ${epub.h2.italic ? 'italic' : 'normal'}; font-size: ${fontSize + epub.h2.sizeDelta}px; margin: 1em 0 0.3em; }
+    .epub-content h3 { font-weight: ${epub.h3.bold ? '700' : '400'}; font-style: ${epub.h3.italic ? 'italic' : 'normal'}; font-size: ${fontSize + epub.h3.sizeDelta}px; margin: 0.9em 0 0.3em; }
+    .epub-content h4 { font-weight: ${epub.h4.bold ? '700' : '400'}; font-style: ${epub.h4.italic ? 'italic' : 'normal'}; font-size: ${fontSize + epub.h4.sizeDelta}px; margin: 0.8em 0 0.2em; }
+    .epub-content h5 { font-weight: ${epub.h5.bold ? '700' : '400'}; font-style: ${epub.h5.italic ? 'italic' : 'normal'}; font-size: ${fontSize + epub.h5.sizeDelta}px; margin: 0.7em 0 0.2em; }
+    .epub-content p  { margin-bottom: ${epub.paragraphSpacing}rem; text-indent: ${epub.paragraphIndent}rem; line-height: 1.7; }
+    .epub-content hr { border: none; border-top: 1px solid #cbd5e1; margin: 1.5em 0; }
+    .epub-content img { max-width: 100%; height: auto; display: block; margin: 1rem ${epub.imageAlign === 'center' ? 'auto' : epub.imageAlign === 'right' ? '0 0 auto' : '0 auto 0 0'}; border-radius: 4px; }
+    .epub-content ul { list-style: disc; padding-left: 1.5rem; margin-bottom: ${epub.paragraphSpacing}rem; }
+    .epub-content ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: ${epub.paragraphSpacing}rem; }
+    .epub-content li { margin-bottom: 0.25rem; line-height: 1.6; }
+    .epub-content blockquote { border-left: 3px solid #94a3b8; padding-left: 1rem; margin: 1rem 0; color: #64748b; font-style: italic; }
+    .epub-content table { border-collapse: collapse; width: 100%; margin-bottom: ${epub.paragraphSpacing}rem; }
+    .epub-content td, .epub-content th { border: 1px solid #cbd5e1; padding: 0.4rem 0.6rem; }
+    .epub-content th { background: #f1f5f9; font-weight: 600; }
+  `
+
   // Chessboard icon — 4×4 grid SVG
   const ChessboardIcon = () => (
     <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
@@ -177,6 +199,7 @@ export default function BookReader() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-50">
+      <style dangerouslySetInnerHTML={{ __html: epubCss }} />
 
       {/* ── Sticky nav bar ── */}
       <nav className="sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur">
@@ -280,10 +303,7 @@ export default function BookReader() {
           ) : (
             <div
               ref={contentRef}
-              className="prose prose-slate max-w-none
-                [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:rounded
-                [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-2 [&_td]:py-1
-                [&_th]:border [&_th]:border-slate-300 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-50"
+              className="epub-content max-w-none"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           )}
@@ -304,9 +324,9 @@ export default function BookReader() {
                 <ChessBoard fen={studyFen} orientation="white" />
               </div>
 
-              {/* Stockfish eval bar */}
+              {/* Stockfish eval bar — always horizontal in study panel */}
               <div className="shrink-0">
-                <EvalBar fen={studyFen} />
+                <EvalBar fen={studyFen} direction="horizontal" />
               </div>
 
               {/* FEN input */}
