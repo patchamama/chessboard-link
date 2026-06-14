@@ -4,8 +4,10 @@ export function isLocalhostHost(): boolean {
   return LOCAL_HOSTNAMES.includes(window.location.hostname)
 }
 
-/** True when running on GitHub Pages (*.github.io) or localhost — both run demo mode. */
+/** True when running in demo mode (GitHub Pages, demo host, or VITE_DEMO=true).
+ *  localhost does NOT activate demo mode — it talks to the real backend. */
 export function isDemoHost(): boolean {
+  if (import.meta.env.VITE_DEMO === 'true') return true
   const h = window.location.hostname
-  return isLocalhostHost() || h.endsWith('.github.io') || h === 'demo.chessreader.app'
+  return h.endsWith('.github.io') || h === 'demo.chessreader.app'
 }
