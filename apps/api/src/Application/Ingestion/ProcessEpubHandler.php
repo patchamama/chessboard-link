@@ -87,7 +87,8 @@ final class ProcessEpubHandler
                     }
                 }
 
-                $this->books->saveChapter($bookId, $order, $title, (string) $html);
+                $inlinedHtml = $this->inlineImages((string) $html, $opfDir);
+                $this->books->saveChapter($bookId, $order, $title, $inlinedHtml);
                 $order++;
             }
 
@@ -117,6 +118,34 @@ final class ProcessEpubHandler
             ));
             throw new \RuntimeException('EPUB processing failed: ' . $e->getMessage(), 0, $e);
         }
+    }
+
+    private function inlineImages(string $html, string $baseDir): string
+    {
+        return preg_replace_callback(
+            '/<img([^>]*)\ssrc=["\']([^"\']+)["\']([^>]*)>/i',
+            function (array $m) use ($baseDir): string {
+                $src = html_entity_decode($m[2]);
+                // Already a data URI or absolute URL — leave as-is
+                if (str_starts_with($src, 'data:') || str_starts_with($src, 'http')) {
+                    return $m[0];
+                }
+                $path = realpath($baseDir . '/' . ltrim($src, '/'));
+                if ($path === false || !is_file($path)) {
+                    return $m[0];
+                }
+                $mime = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+                    'png'  => 'image/png',
+                    'gif'  => 'image/gif',
+                    'webp' => 'image/webp',
+                    'svg'  => 'image/svg+xml',
+                    default => 'image/jpeg',
+                };
+                $data = base64_encode((string) file_get_contents($path));
+                return "<img{$m[1]} src=\"data:{$mime};base64,{$data}\"{$m[3]}>";
+            },
+            $html,
+        ) ?? $html;
     }
 
     private function resolveOpfPath(string $extractDir): string

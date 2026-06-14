@@ -13,9 +13,10 @@ interface InlineGameProps {
   treeId: string
   game: RecognizedGame
   fullText: string
+  onFenClick?: (fen: string) => void
 }
 
-export default function InlineGame({ treeId, game, fullText }: InlineGameProps) {
+export default function InlineGame({ treeId, game, fullText, onFenClick }: InlineGameProps) {
   const orientation    = useViewerStore((s) => s.orientation)
   const isInVariation  = useViewerStore((s) => s.isInVariation[treeId] ?? false)
   const currentNodeId  = useViewerStore((s) => s.currentNodeId[treeId] ?? null)
@@ -105,6 +106,7 @@ export default function InlineGame({ treeId, game, fullText }: InlineGameProps) 
             activeNodeId={currentNodeId}
             onSelectNode={(id) => selectNode(id, false)}
             onPreviewFen={setPreviewFen}
+            onFenClick={onFenClick}
           />
           <VariationTree
             tree={game.tree}

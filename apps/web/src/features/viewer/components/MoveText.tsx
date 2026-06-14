@@ -7,9 +7,10 @@ interface MoveTextProps {
   activeNodeId: string | null
   onSelectNode: (nodeId: string) => void
   onPreviewFen?: (fen: string | null) => void
+  onFenClick?: (fen: string) => void
 }
 
-export default function MoveText({ fullText, game, activeNodeId, onSelectNode, onPreviewFen }: MoveTextProps) {
+export default function MoveText({ fullText, game, activeNodeId, onSelectNode, onPreviewFen, onFenClick }: MoveTextProps) {
   const nodes = mainlineNodes(game.tree)
 
   const text = fullText.slice(game.charStart, game.charEnd)
@@ -33,7 +34,7 @@ export default function MoveText({ fullText, game, activeNodeId, onSelectNode, o
         className={`inline font-medium px-0.5 rounded hover:bg-yellow-200 focus:outline-none ${
           isActive ? 'bg-yellow-300 font-bold' : ''
         }`}
-        onClick={() => onSelectNode(node.id)}
+        onClick={() => { onSelectNode(node.id); onFenClick?.(node.fen) }}
         onMouseEnter={() => onPreviewFen?.(node.fen)}
         onMouseLeave={() => onPreviewFen?.(null)}
       >

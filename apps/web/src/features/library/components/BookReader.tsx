@@ -7,17 +7,8 @@ import type { GameTree } from '@chess-ebook/chess-shared'
 import InlineGame from '../../viewer/components/InlineGame'
 import { useKeyboardNavigation } from '../../viewer/hooks/useKeyboardNavigation'
 import ChessBoard from '../../../shared/chess/ChessBoard'
-
-const STORAGE_KEY = (bookId: number) => `book-last-chapter-${bookId}`
-
-function getLastChapter(bookId: number): number {
-  const stored = localStorage.getItem(STORAGE_KEY(bookId))
-  return stored ? parseInt(stored, 10) : 1
-}
-
-function saveLastChapter(bookId: number, chapter: number) {
-  localStorage.setItem(STORAGE_KEY(bookId), String(chapter))
-}
+import { useViewerStore } from '../../viewer/store/viewerStore'
+import { getProgress, saveProgress } from '../store/readingStore'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -25,11 +16,23 @@ export default function BookReader() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = Number(bookId)
 
-  const [currentChapter, setCurrentChapter] = useState<number>(() => getLastChapter(id))
+  const [currentChapter, setCurrentChapter] = useState<number>(() => {
+    const p = getProgress(id)
+    return p?.chapter ?? 1
+  })
   const [showToc, setShowToc] = useState(false)
   const [showStudy, setShowStudy] = useState(false)
-  const [studyFen, setStudyFen] = useState(INITIAL_FEN)
   const [studyInput, setStudyInput] = useState(INITIAL_FEN)
+
+  // Study board FEN from store (set when user clicks a move)
+  const studyFenFromStore = useViewerStore((s) => s.studyFen)
+  const setStudyFen = useViewerStore((s) => s.setStudyFen)
+  const studyFen = studyFenFromStore ?? INITIAL_FEN
+
+  // Sync studyInput when store changes
+  useEffect(() => {
+    if (studyFenFromStore) setStudyInput(studyFenFromStore)
+  }, [studyFenFromStore])
 
   const { data, isLoading } = useChapter(id, currentChapter)
   const touchBook = useTouchBook()
@@ -43,7 +46,7 @@ export default function BookReader() {
   }, [id])
 
   useEffect(() => {
-    saveLastChapter(id, currentChapter)
+    saveProgress(id, currentChapter)
   }, [id, currentChapter])
 
   const goTo = useCallback((n: number) => {
@@ -51,6 +54,13 @@ export default function BookReader() {
     setShowToc(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  // When user clicks a move notation → send FEN to study board and show it
+  const handleFenClick = useCallback((fen: string) => {
+    setStudyFen(fen)
+    setStudyInput(fen)
+    setShowStudy(true)
+  }, [setStudyFen])
 
   const html = data?.html ?? ''
   const plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -79,7 +89,6 @@ export default function BookReader() {
       {/* ── Sticky nav bar ── */}
       <nav className="sticky top-0 z-30 flex items-center gap-2 border-b border-slate-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
 
-        {/* Prev */}
         <button
           onClick={() => goTo(currentChapter - 1)}
           disabled={currentChapter <= 1}
@@ -91,7 +100,6 @@ export default function BookReader() {
           </svg>
         </button>
 
-        {/* Next */}
         <button
           onClick={() => goTo(currentChapter + 1)}
           disabled={currentChapter >= maxChapter}
@@ -105,7 +113,6 @@ export default function BookReader() {
 
         <div className="mx-1 h-5 w-px bg-slate-200" />
 
-        {/* TOC toggle */}
         <button
           onClick={() => setShowToc((v) => !v)}
           title="Table of contents"
@@ -120,7 +127,6 @@ export default function BookReader() {
           </svg>
         </button>
 
-        {/* Chapter info */}
         <span className="ml-2 truncate text-sm font-medium text-slate-700 max-w-xs">
           {data?.title ?? '…'}
         </span>
@@ -130,7 +136,6 @@ export default function BookReader() {
 
         <div className="mx-1 h-5 w-px bg-slate-200" />
 
-        {/* Study board toggle */}
         <button
           onClick={() => setShowStudy((v) => !v)}
           title={showStudy ? 'Hide study board' : 'Show study board'}
@@ -140,7 +145,6 @@ export default function BookReader() {
               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          {/* Chess knight icon */}
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 22H5v-2h14v2M13 2c-1.1 0-2 .9-2 2 0 .56.23 1.05.59 1.41C9.42 6.46 8 8.58 8 11c0 1.38.47 2.63 1.24 3.62L8 16h8l-1.24-1.38C15.53 13.63 16 12.38 16 11c0-2.42-1.42-4.54-3.59-5.59C12.77 5.05 13 4.56 13 4c0-1.1-.9-2-2-2z" />
           </svg>
@@ -176,7 +180,7 @@ export default function BookReader() {
       <div className={`flex flex-1 gap-0 ${showStudy ? 'divide-x divide-slate-200' : ''}`}>
 
         {/* Reading pane */}
-        <main className={`flex-1 overflow-x-hidden px-6 py-8 ${showStudy ? 'min-w-0' : 'max-w-3xl mx-auto'}`}>
+        <main className={`flex-1 overflow-x-hidden px-6 py-8 ${showStudy ? 'min-w-0' : 'max-w-3xl mx-auto w-full'}`}>
           {isLoading ? (
             <div role="status" className="flex justify-center p-16">
               <span className="sr-only">Loading…</span>
@@ -184,7 +188,7 @@ export default function BookReader() {
             </div>
           ) : games.length === 0 ? (
             <div
-              className="prose prose-slate max-w-none"
+              className="prose prose-slate max-w-none [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:rounded"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (
@@ -197,6 +201,7 @@ export default function BookReader() {
                     treeId={treeId}
                     game={game}
                     fullText={plainText}
+                    onFenClick={handleFenClick}
                   />
                 )
               })}
