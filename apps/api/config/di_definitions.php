@@ -23,6 +23,7 @@ use App\Application\Auth\RejectUserHandler;
 use App\Application\Auth\RequestPasswordResetHandler;
 use App\Application\Auth\ResetPasswordHandler;
 use App\Application\Library\SetLastReadBookHandler;
+use App\Application\Library\DeleteBookHandler;
 use App\Application\Library\UpdateBookHandler;
 use App\Domain\Auth\PasswordResetRepository;
 use App\Infrastructure\Auth\LoggingPasswordResetNotifier;
@@ -185,6 +186,10 @@ return [
         return new UpdateBookHandler($c->get(BookRepository::class));
     },
 
+    DeleteBookHandler::class => function (ContainerInterface $c) {
+        return new DeleteBookHandler($c->get(BookRepository::class));
+    },
+
     SetLastReadBookHandler::class => function (ContainerInterface $c) {
         return new SetLastReadBookHandler($c->get(UserRepository::class));
     },
@@ -228,7 +233,9 @@ return [
             $c->get(ListBooksHandler::class),
             $c->get(GetChapterHandler::class),
             $c->get(UpdateBookHandler::class),
+            $c->get(DeleteBookHandler::class),
             $c->get(SetLastReadBookHandler::class),
+            $c->get(OpfManifestParser::class),
         );
     },
 

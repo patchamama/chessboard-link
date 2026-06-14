@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useUpdateBook } from '../api/libraryApi'
+import { useUpdateBook, useDeleteBook } from '../api/libraryApi'
 
 interface BookInput {
   id: number
@@ -18,7 +18,9 @@ export default function BookEditModal({ book, onClose }: Props) {
   const [author, setAuthor] = useState(book.author)
   const [description, setDescription] = useState(book.description)
   const [error, setError] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const updateBook = useUpdateBook()
+  const deleteBook = useDeleteBook()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,6 +30,16 @@ export default function BookEditModal({ book, onClose }: Props) {
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update book.')
+    }
+  }
+
+  const handleDelete = async () => {
+    setError('')
+    try {
+      await deleteBook.mutateAsync(book.id)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete book.')
     }
   }
 
@@ -83,6 +95,43 @@ export default function BookEditModal({ book, onClose }: Props) {
           >
             Cancel
           </button>
+        </div>
+
+        {/* Danger zone — delete book */}
+        <div className="border-t border-slate-200 pt-4">
+          {!confirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="w-full rounded-md border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete book
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-red-700">
+                Delete <strong>{book.title}</strong>? This permanently removes the book, its
+                chapters and the uploaded file. This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteBook.isPending}
+                  className="flex-1 rounded-md bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  {deleteBook.isPending ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="flex-1 rounded-md border border-slate-300 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </form>
     </div>

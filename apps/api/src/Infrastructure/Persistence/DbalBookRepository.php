@@ -65,6 +65,13 @@ final class DbalBookRepository implements BookRepository
         ], ['id' => $id]);
     }
 
+    public function delete(int $id): void
+    {
+        // No ON DELETE CASCADE on the FK, so remove chapters first.
+        $this->connection->delete('chapters', ['book_id' => $id]);
+        $this->connection->delete('books', ['id' => $id]);
+    }
+
     public function findByOwner(int $ownerId): array
     {
         $rows = $this->connection->fetchAllAssociative(

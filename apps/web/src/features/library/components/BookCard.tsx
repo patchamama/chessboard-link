@@ -23,10 +23,23 @@ function formatRelativeDate(iso: string): string {
 
 export default function BookCard({ book, totalChapters }: Props) {
   const [editing, setEditing] = useState(false)
+  const [hasCover, setHasCover] = useState(true)
   const progress = getProgress(book.id)
 
   return (
     <div className="border rounded-lg p-4 flex flex-col gap-2 bg-white shadow-sm hover:shadow-md transition-shadow">
+      {/* Cover — hidden gracefully if the book has none */}
+      {hasCover && (
+        <Link to={`/read/${book.id}`} className="block">
+          <img
+            src={`/api/library/books/${book.id}/cover`}
+            alt={`Cover of ${book.title}`}
+            loading="lazy"
+            onError={() => setHasCover(false)}
+            className="mb-1 h-44 w-full rounded-md object-cover bg-slate-100"
+          />
+        </Link>
+      )}
       <div className="flex items-start justify-between">
         <h2 className="font-semibold text-lg leading-snug">{book.title}</h2>
         <button

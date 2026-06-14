@@ -56,6 +56,15 @@ export function useUpdateBook() {
   })
 }
 
+export function useDeleteBook() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      httpClient(`/api/library/books/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library', 'books'] }),
+  })
+}
+
 export function useTouchBook() {
   return useMutation({
     mutationFn: (bookId: number) =>

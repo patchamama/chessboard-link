@@ -61,12 +61,17 @@ return function (App $app): void {
         $group->post('/parse', [WebparserController::class, 'parse']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
 
+    // Public book cover — served as a plain <img>, which cannot send an auth
+    // header. Only exposes the cover image binary (no sensitive data).
+    $app->get('/api/library/books/{id:[0-9]+}/cover', [LibraryController::class, 'cover']);
+
     // Library routes (require JWT + Approved)
     $app->group('/api/library', function (RouteCollectorProxy $group) {
         $group->get('/books', [LibraryController::class, 'books']);
         $group->get('/books/{id:[0-9]+}/chapters/{n:[0-9]+}', [LibraryController::class, 'chapter']);
         $group->get('/books/{id:[0-9]+}/images/{path:.+}', [LibraryController::class, 'image']);
         $group->put('/books/{id:[0-9]+}', [LibraryController::class, 'updateBook']);
+        $group->delete('/books/{id:[0-9]+}', [LibraryController::class, 'deleteBook']);
         $group->post('/books/{id:[0-9]+}/touch', [LibraryController::class, 'touch']);
         $group->post('/upload', [IngestionController::class, 'upload']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);

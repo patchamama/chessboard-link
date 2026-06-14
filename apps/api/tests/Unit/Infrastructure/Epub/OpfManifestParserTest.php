@@ -67,6 +67,62 @@ final class OpfManifestParserTest extends TestCase
         self::assertSame('Capablanca', $result['author']);
     }
 
+    public function test_cover_falls_back_to_first_image(): void
+    {
+        $parser = new OpfManifestParser();
+        $result = $parser->parse($this->extractDir . '/OEBPS/content.opf');
+
+        // The fixture has no explicit cover meta/properties → first image is used.
+        self::assertSame('Images/g1.jpg', $result['cover']);
+    }
+
+    public function test_cover_from_meta_name_cover(): void
+    {
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>T</dc:title>
+    <meta name="cover" content="cover-img"/>
+  </metadata>
+  <manifest>
+    <item id="cover-img" href="Images/cover.jpg" media-type="image/jpeg"/>
+    <item id="other" href="Images/other.jpg" media-type="image/jpeg"/>
+  </manifest>
+  <spine/>
+</package>
+XML;
+        $tmp = sys_get_temp_dir() . '/opf_cover_' . uniqid() . '.opf';
+        file_put_contents($tmp, $opf);
+
+        $result = (new OpfManifestParser())->parse($tmp);
+        unlink($tmp);
+
+        self::assertSame('Images/cover.jpg', $result['cover']);
+    }
+
+    public function test_cover_from_epub3_properties(): void
+    {
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>T</dc:title></metadata>
+  <manifest>
+    <item id="other" href="Images/other.jpg" media-type="image/jpeg"/>
+    <item id="cv" href="Images/the-cover.png" media-type="image/png" properties="cover-image"/>
+  </manifest>
+  <spine/>
+</package>
+XML;
+        $tmp = sys_get_temp_dir() . '/opf_cover3_' . uniqid() . '.opf';
+        file_put_contents($tmp, $opf);
+
+        $result = (new OpfManifestParser())->parse($tmp);
+        unlink($tmp);
+
+        self::assertSame('Images/the-cover.png', $result['cover']);
+    }
+
     private function rrmdir(string $dir): void
     {
         if (!is_dir($dir)) {

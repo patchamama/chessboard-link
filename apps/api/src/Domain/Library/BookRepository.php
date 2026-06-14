@@ -16,6 +16,9 @@ interface BookRepository
 
     public function update(int $id, string $title, string $author, string $description): void;
 
+    /** Deletes a book and all of its chapters. */
+    public function delete(int $id): void;
+
     public function save(Book $book): int;
 
     public function saveChapter(int $bookId, int $order, string $title, string $html): int;

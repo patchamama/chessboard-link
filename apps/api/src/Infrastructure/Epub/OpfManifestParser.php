@@ -13,11 +13,12 @@ namespace App\Infrastructure\Epub;
  *   manifest — ['id' => 'href', ...]
  *   spine    — ['id1', 'id2', ...] in spine order
  *   images   — ['href', ...] of image items (media-type image/*)
+ *   cover    — href of the cover image, or null
  */
 final class OpfManifestParser
 {
     /**
-     * @return array{title:string,author:string,manifest:array<string,string>,spine:list<string>,images:list<string>}
+     * @return array{title:string,author:string,manifest:array<string,string>,spine:list<string>,images:list<string>,cover:?string}
      */
     public function parse(string $opfPath): array
     {
@@ -30,9 +31,19 @@ final class OpfManifestParser
             throw new \RuntimeException("Cannot read OPF file: $opfPath");
         }
 
+        return $this->parseXml($xml);
+    }
+
+    /**
+     * Parse OPF content from a raw XML string (e.g. read straight out of a ZIP).
+     *
+     * @return array{title:string,author:string,manifest:array<string,string>,spine:list<string>,images:list<string>,cover:?string}
+     */
+    public function parseXml(string $xml): array
+    {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($xml)) {
-            throw new \RuntimeException("Cannot parse OPF XML: $opfPath");
+            throw new \RuntimeException('Cannot parse OPF XML');
         }
 
         $xpath = new \DOMXPath($dom);
@@ -52,8 +63,9 @@ final class OpfManifestParser
             : '';
 
         // Manifest items: id -> href
-        $manifest = [];
-        $images   = [];
+        $manifest      = [];
+        $images        = [];
+        $coverByProps  = null; // EPUB3: item with properties="cover-image"
         $itemNodes = $xpath->query('//opf:manifest/opf:item');
         if ($itemNodes === false || $itemNodes->length === 0) {
             // Fallback without namespace
@@ -69,7 +81,34 @@ final class OpfManifestParser
                 if (str_starts_with($mediaType, 'image/')) {
                     $images[] = $href;
                 }
+                $props = $item->getAttribute('properties');
+                if ($props !== '' && str_contains($props, 'cover-image')) {
+                    $coverByProps = $href;
+                }
             }
+        }
+
+        // Cover detection priority:
+        //   1. EPUB3 item with properties="cover-image"
+        //   2. EPUB2 <meta name="cover" content="itemId"> → manifest[itemId]
+        //   3. first image in the manifest
+        $cover = $coverByProps;
+        if ($cover === null) {
+            $metaCover = $xpath->query('//opf:metadata/opf:meta[@name="cover"]');
+            if ($metaCover === false || $metaCover->length === 0) {
+                $metaCover = $xpath->query('//*[local-name()="meta"][@name="cover"]');
+            }
+            if ($metaCover !== false && $metaCover->length > 0) {
+                /** @var \DOMElement $meta */
+                $meta      = $metaCover->item(0);
+                $coverId   = $meta->getAttribute('content');
+                if ($coverId !== '' && isset($manifest[$coverId])) {
+                    $cover = $manifest[$coverId];
+                }
+            }
+        }
+        if ($cover === null && count($images) > 0) {
+            $cover = $images[0];
         }
 
         // Spine: ordered list of idrefs
@@ -86,6 +125,6 @@ final class OpfManifestParser
             }
         }
 
-        return compact('title', 'author', 'manifest', 'spine', 'images');
+        return compact('title', 'author', 'manifest', 'spine', 'images', 'cover');
     }
 }
