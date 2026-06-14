@@ -12,6 +12,7 @@ import { VariationChooser } from './VariationChooser'
 import { EngineEvalPanel } from './EngineEvalPanel'
 import { useEngineLines } from '../../../shared/stockfish/useEngineLines'
 import { buildBoardArrows, ENGINE_ARROW_COLOR, PREMOVE_ARROW_COLOR } from '../utils/engineArrows'
+import { useMoveSound } from '../../../shared/chess/useMoveSound'
 import type { Arrow } from 'react-chessboard'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -86,6 +87,9 @@ export function StudyBoard() {
   const evalDirection = useSettingsStore((s) => s.evalBarDirection)
   const showEval = useSettingsStore((s) => s.showEval)
   const hideEngineArrow = useSettingsStore((s) => s.hideEngineArrow)
+  const boardSize = useSettingsStore((s) => s.boardSize)
+  const autoplayDelay = useSettingsStore((s) => s.autoplayDelay)
+  const playMoveSound = useMoveSound()
 
   const activeGame = useStudyBoardStore((s) => s.activeGame)
   const orientation = useStudyBoardStore((s) => s.orientation)
@@ -170,17 +174,17 @@ export function StudyBoard() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'ArrowRight') {
         e.preventDefault()
-        if (nav.canNext) nav.next()
+        if (nav.canNext) { nav.next(); playMoveSound() }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        if (nav.canPrev) nav.prev()
+        if (nav.canPrev) { nav.prev(); playMoveSound() }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeGame, nav])
+  }, [activeGame, nav, playMoveSound])
 
-  // Autoplay loop.
+  // Autoplay loop. Interval is driven by the configurable autoplayDelay (seconds).
   useEffect(() => {
     if (!autoplay) return
     const tick = () => {
@@ -189,10 +193,11 @@ export function StudyBoard() {
         return
       }
       nav.next()
+      playMoveSound()
     }
-    const interval = window.setInterval(tick, 1200)
+    const interval = window.setInterval(tick, Math.max(1, autoplayDelay) * 1000)
     return () => window.clearInterval(interval)
-  }, [autoplay, nav, setAutoplay])
+  }, [autoplay, nav, setAutoplay, autoplayDelay, playMoveSound])
 
   const handleNext = () => {
     if (nav.hasChoiceAhead) {
@@ -200,6 +205,7 @@ export function StudyBoard() {
       return
     }
     nav.next()
+    playMoveSound()
   }
 
   const highlightStyles: Record<string, CSSProperties> = Object.fromEntries(
@@ -240,7 +246,7 @@ export function StudyBoard() {
   const playMode = toolMode === 'none'
 
   const boardWrapper = (
-    <div className="relative w-full">
+    <div className="relative mx-auto w-full" style={{ maxWidth: `${boardSize}%` }}>
       <ChessBoard
         fen={fen}
         orientation={orientation}
@@ -303,7 +309,7 @@ export function StudyBoard() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 19l-7-7 7-7M11 19l-7-7 7-7" />
           </svg>
         </NavButton>
-        <NavButton onClick={nav.prev} disabled={!activeGame || !nav.canPrev} title="Previous move">
+        <NavButton onClick={() => { nav.prev(); playMoveSound() }} disabled={!activeGame || !nav.canPrev} title="Previous move">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>

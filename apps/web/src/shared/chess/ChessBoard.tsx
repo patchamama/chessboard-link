@@ -2,6 +2,7 @@ import { Chessboard } from 'react-chessboard'
 import type { Arrow } from 'react-chessboard'
 import type { CSSProperties } from 'react'
 import { useSettingsStore, BOARD_THEMES } from '../settings/settingsStore'
+import { getPieceSet } from './pieces'
 
 export interface LastMove {
   from: string
@@ -36,6 +37,12 @@ const HIGHLIGHT_STYLE: CSSProperties = {
   backgroundColor: 'rgba(255, 214, 10, 0.5)',
 }
 
+// Subtle corner-dot highlight used when "full square highlight" is OFF.
+const DOT_HIGHLIGHT_STYLE: CSSProperties = {
+  background:
+    'radial-gradient(circle at 50% 50%, rgba(255,214,10,0.85) 12%, transparent 16%)',
+}
+
 const SELECTED_STYLE: CSSProperties = {
   backgroundColor: 'rgba(56, 142, 255, 0.45)',
 }
@@ -61,12 +68,18 @@ export default function ChessBoard({
   legalTargets,
 }: ChessBoardProps) {
   const boardTheme = useSettingsStore((s) => s.boardTheme)
+  const pieceTheme = useSettingsStore((s) => s.pieceTheme)
+  const showBoardLabels = useSettingsStore((s) => s.showBoardLabels)
+  const fullSquareHighlight = useSettingsStore((s) => s.fullSquareHighlight)
   const theme = BOARD_THEMES[boardTheme]
+  const pieces = getPieceSet(pieceTheme)
+
+  const lastMoveStyle = fullSquareHighlight ? HIGHLIGHT_STYLE : DOT_HIGHLIGHT_STYLE
 
   const squareStyles: Record<string, CSSProperties> = {}
   if (lastMove) {
-    squareStyles[lastMove.from] = HIGHLIGHT_STYLE
-    squareStyles[lastMove.to]   = HIGHLIGHT_STYLE
+    squareStyles[lastMove.from] = lastMoveStyle
+    squareStyles[lastMove.to]   = lastMoveStyle
   }
   if (customSquareStyles) {
     for (const [sq, style] of Object.entries(customSquareStyles)) {
@@ -103,6 +116,8 @@ export default function ChessBoard({
           : {}),
         lightSquareStyle: { backgroundColor: theme.light },
         darkSquareStyle:  { backgroundColor: theme.dark },
+        showNotation: showBoardLabels,
+        ...(pieces ? { pieces } : {}),
       }}
     />
   )

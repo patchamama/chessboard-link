@@ -1,4 +1,4 @@
-import { useSettingsStore, BOARD_THEMES, FONT_FAMILIES, STOCKFISH_VERSIONS, type BoardTheme, type FontFamily, type EvalBarDirection, type StockfishVersion, type ImageAlign, type HeadingStyle, type EngineVariations } from './settingsStore'
+import { useSettingsStore, BOARD_THEMES, FONT_FAMILIES, STOCKFISH_VERSIONS, APP_THEME_PRESETS, PIECE_THEMES, type BoardTheme, type FontFamily, type EvalBarDirection, type StockfishVersion, type ImageAlign, type HeadingStyle, type EngineVariations, type AppTheme, type PieceTheme } from './settingsStore'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -75,6 +75,24 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           </button>
         </div>
 
+        {/* App theme */}
+        <label className={labelClass}>App theme</label>
+        <div className="flex gap-2">
+          {(['light', 'dark'] as AppTheme[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => s.applyAppTheme(t)}
+              className={`flex-1 rounded py-1 text-xs border transition-colors ${
+                s.appTheme === t
+                  ? 'bg-amber-400 text-gray-900 border-amber-400 font-semibold'
+                  : 'bg-gray-700 text-gray-200 border-gray-600 hover:border-amber-400'
+              }`}
+            >
+              {APP_THEME_PRESETS[t].label}
+            </button>
+          ))}
+        </div>
+
         {/* Board theme */}
         <label className={labelClass}>Board theme</label>
         <div className="grid grid-cols-3 gap-1">
@@ -92,6 +110,59 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
             </button>
           ))}
         </div>
+
+        {/* Piece theme */}
+        <label className={labelClass}>Piece theme</label>
+        <select
+          value={s.pieceTheme}
+          onChange={(e) => s.set({ pieceTheme: e.target.value as PieceTheme })}
+          className={inputClass}
+        >
+          {(Object.entries(PIECE_THEMES) as [PieceTheme, typeof PIECE_THEMES[PieceTheme]][]).map(([key, p]) => (
+            <option key={key} value={key}>{p.label}</option>
+          ))}
+        </select>
+
+        {/* Board size */}
+        <label className={labelClass}>Board size — {s.boardSize}%</label>
+        <input
+          type="range" min={30} max={100} step={1}
+          value={s.boardSize}
+          onChange={(e) => s.set({ boardSize: Number(e.target.value) })}
+          className="w-full accent-amber-400"
+        />
+
+        {/* Behavior toggles */}
+        <label className={labelClass}>Board behavior</label>
+        <div className="flex flex-col gap-2">
+          <Toggle
+            on={s.showBoardLabels}
+            onClick={() => s.set({ showBoardLabels: !s.showBoardLabels })}
+            label="Board labels (a-h/1-8)"
+          />
+          <Toggle
+            on={s.fullSquareHighlight}
+            onClick={() => s.set({ fullSquareHighlight: !s.fullSquareHighlight })}
+            label="Full square highlight"
+          />
+          <Toggle
+            on={s.playMoveSound}
+            onClick={() => s.set({ playMoveSound: !s.playMoveSound })}
+            label="Play move sound"
+          />
+        </div>
+
+        {/* Autoplay */}
+        <label className={labelClass}>Autoplay move delay (seconds)</label>
+        <Stepper
+          value={s.autoplayDelay}
+          decLabel="Decrease autoplay delay"
+          incLabel="Increase autoplay delay"
+          canDec={s.autoplayDelay > 1}
+          canInc={s.autoplayDelay < 10}
+          onDec={() => s.set({ autoplayDelay: Math.max(1, s.autoplayDelay - 1) })}
+          onInc={() => s.set({ autoplayDelay: Math.min(10, s.autoplayDelay + 1) })}
+        />
 
         {/* Eval bar direction */}
         <label className={labelClass}>Eval bar direction</label>

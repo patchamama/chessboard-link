@@ -70,6 +70,21 @@ export interface EpubLayout {
 
 export type EngineVariations = 1 | 2 | 3
 
+export type AppTheme = 'light' | 'dark'
+
+export const APP_THEME_PRESETS: Record<AppTheme, { bgColor: string; textColor: string; label: string }> = {
+  light: { bgColor: '#ffffff', textColor: '#1a1a1a', label: 'Light' },
+  dark:  { bgColor: '#1a1a1a', textColor: '#e8e8e8', label: 'Dark'  },
+}
+
+export type PieceTheme = 'default' | 'alpha' | 'merida'
+
+export const PIECE_THEMES: Record<PieceTheme, { label: string }> = {
+  default: { label: 'Default' },
+  alpha:   { label: 'Alpha'   },
+  merida:  { label: 'Merida'  },
+}
+
 export interface AppSettings {
   boardTheme: BoardTheme
   evalBarDirection: EvalBarDirection
@@ -88,6 +103,20 @@ export interface AppSettings {
   textColor: string       // hex
   marginH: number         // horizontal padding rem (0–6)
   epub: EpubLayout
+  /** Light/dark preset selector for bg/text colors. */
+  appTheme: AppTheme
+  /** Piece sprite set. */
+  pieceTheme: PieceTheme
+  /** Board render size as a percentage of its container (30–100). */
+  boardSize: number
+  /** Show file/rank coordinate labels (a–h / 1–8). */
+  showBoardLabels: boolean
+  /** Tint the whole last-move square instead of a subtle dot. */
+  fullSquareHighlight: boolean
+  /** Play a short sound when navigating moves. */
+  playMoveSound: boolean
+  /** Delay in seconds between autoplayed moves. */
+  autoplayDelay: number
 }
 
 const DEFAULT_EPUB: EpubLayout = {
@@ -115,10 +144,19 @@ const DEFAULT: AppSettings = {
   textColor: '#1a1a1a',
   marginH: 2,
   epub: DEFAULT_EPUB,
+  appTheme: 'light',
+  pieceTheme: 'default',
+  boardSize: 100,
+  showBoardLabels: true,
+  fullSquareHighlight: true,
+  playMoveSound: true,
+  autoplayDelay: 1,
 }
 
 interface SettingsStore extends AppSettings {
   set: (patch: Partial<AppSettings>) => void
+  /** Switch app theme AND apply its bg/text color preset in one shot. */
+  applyAppTheme: (theme: AppTheme) => void
   reset: () => void
 }
 
@@ -127,6 +165,13 @@ export const useSettingsStore = create<SettingsStore>()(
     (set) => ({
       ...DEFAULT,
       set: (patch) => set((s) => ({ ...s, ...patch })),
+      applyAppTheme: (theme) =>
+        set((s) => ({
+          ...s,
+          appTheme: theme,
+          bgColor: APP_THEME_PRESETS[theme].bgColor,
+          textColor: APP_THEME_PRESETS[theme].textColor,
+        })),
       reset: () => set({ ...DEFAULT }),
     }),
     { name: 'chessreader-settings' },
