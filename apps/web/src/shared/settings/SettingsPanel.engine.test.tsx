@@ -37,9 +37,11 @@ describe('SettingsPanel — Engine section', () => {
     expect(useSettingsStore.getState().engineVariations).toBe(3)
   })
 
-  it('toggles Hide engine move arrow', () => {
+  it('toggles Show engine move arrow', () => {
     render(<SettingsPanel onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /hide engine move arrow/i }))
-    expect(useSettingsStore.getState().hideEngineArrow).toBe(true)
+    // Default is ON; clicking turns it off.
+    expect(useSettingsStore.getState().showEngineArrow).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: /show engine move arrow/i }))
+    expect(useSettingsStore.getState().showEngineArrow).toBe(false)
   })
 })

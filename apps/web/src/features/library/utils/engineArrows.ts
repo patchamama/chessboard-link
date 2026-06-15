@@ -9,7 +9,7 @@ export interface BoardArrowState {
   /** annotation arrows drawn by the user (always shown) */
   userArrows: Arrow[]
   showEval: boolean
-  hideEngineArrow: boolean
+  showEngineArrow: boolean
   /** engine best move as UCI (e.g. "e2e4"), if available */
   bestMoveUci?: string
   /** the tree's next move (premove), from→to, if any */
@@ -33,7 +33,7 @@ export function buildBoardArrows(state: BoardArrowState): Arrow[] {
   const arrows: Arrow[] = [...state.userArrows]
 
   if (state.showEval) {
-    if (!state.hideEngineArrow && state.bestMoveUci) {
+    if (state.showEngineArrow && state.bestMoveUci) {
       const sq = uciSquares(state.bestMoveUci)
       if (sq) {
         arrows.push({ startSquare: sq.from, endSquare: sq.to, color: ENGINE_ARROW_COLOR })

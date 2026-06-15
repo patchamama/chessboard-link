@@ -13,26 +13,26 @@ describe('buildBoardArrows', () => {
     const arrows = buildBoardArrows({
       userArrows: [userArrow],
       showEval: false,
-      hideEngineArrow: false,
+      showEngineArrow: true,
     })
     expect(arrows).toContainEqual(userArrow)
   })
 
-  it('adds the engine best-move arrow when eval is on and arrow not hidden', () => {
+  it('adds the engine best-move arrow when eval is on and arrow shown', () => {
     const arrows = buildBoardArrows({
       userArrows: [],
       showEval: true,
-      hideEngineArrow: false,
+      showEngineArrow: true,
       bestMoveUci: 'e2e4',
     })
     expect(arrows).toContainEqual({ startSquare: 'e2', endSquare: 'e4', color: ENGINE_ARROW_COLOR })
   })
 
-  it('omits the engine arrow when hideEngineArrow is true', () => {
+  it('omits the engine arrow when showEngineArrow is false', () => {
     const arrows = buildBoardArrows({
       userArrows: [],
       showEval: true,
-      hideEngineArrow: true,
+      showEngineArrow: false,
       bestMoveUci: 'e2e4',
     })
     expect(arrows).toHaveLength(0)
@@ -42,7 +42,7 @@ describe('buildBoardArrows', () => {
     const arrows = buildBoardArrows({
       userArrows: [],
       showEval: false,
-      hideEngineArrow: false,
+      showEngineArrow: true,
       nextMove: { from: 'g1', to: 'f3' },
     })
     expect(arrows).toContainEqual({ startSquare: 'g1', endSquare: 'f3', color: PREMOVE_ARROW_COLOR })
@@ -52,7 +52,7 @@ describe('buildBoardArrows', () => {
     const arrows = buildBoardArrows({
       userArrows: [],
       showEval: true,
-      hideEngineArrow: true,
+      showEngineArrow: false,
       nextMove: { from: 'g1', to: 'f3' },
     })
     expect(arrows).toHaveLength(0)
@@ -62,7 +62,7 @@ describe('buildBoardArrows', () => {
     const arrows = buildBoardArrows({
       userArrows: [],
       showEval: true,
-      hideEngineArrow: false,
+      showEngineArrow: true,
       bestMoveUci: 'e2e4',
       nextMove: { from: 'g1', to: 'f3' },
     })

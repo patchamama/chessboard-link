@@ -227,9 +227,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
           <label className={labelClass}>Engine arrow</label>
           <div className="flex gap-2">
             <Toggle
-              on={s.hideEngineArrow}
-              onClick={() => s.set({ hideEngineArrow: !s.hideEngineArrow })}
-              label="Hide engine move arrow"
+              on={s.showEngineArrow}
+              onClick={() => s.set({ showEngineArrow: !s.showEngineArrow })}
+              label="Show engine move arrow"
             />
           </div>
         </div>

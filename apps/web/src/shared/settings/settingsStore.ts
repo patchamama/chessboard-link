@@ -108,8 +108,8 @@ export interface AppSettings {
   engineDepth: number
   /** Number of principal variations to compute (MultiPV), 1–3. */
   engineVariations: EngineVariations
-  /** Hide the engine best-move arrow even while the engine is active. */
-  hideEngineArrow: boolean
+  /** Show the engine best-move arrow while the engine is active. */
+  showEngineArrow: boolean
   fontFamily: FontFamily
   fontSize: number        // 12–22 px
   bgColor: string         // hex
@@ -130,6 +130,12 @@ export interface AppSettings {
   playMoveSound: boolean
   /** Delay in seconds between autoplayed moves. */
   autoplayDelay: number
+  /** Board color theme used when regenerating book diagram images. */
+  diagramBoardTheme: BoardTheme
+  /** Piece set used when regenerating book diagram images. */
+  diagramPieceTheme: PieceTheme
+  /** Draw file/rank coordinate symbols on regenerated book diagrams. */
+  diagramCoordinates: boolean
 }
 
 const DEFAULT_EPUB: EpubLayout = {
@@ -150,7 +156,7 @@ const DEFAULT: AppSettings = {
   showEval: true,
   engineDepth: 30,
   engineVariations: 1,
-  hideEngineArrow: false,
+  showEngineArrow: true,
   fontFamily: 'serif',
   fontSize: 16,
   bgColor: '#ffffff',
@@ -164,6 +170,9 @@ const DEFAULT: AppSettings = {
   fullSquareHighlight: true,
   playMoveSound: true,
   autoplayDelay: 1,
+  diagramBoardTheme: 'classic',
+  diagramPieceTheme: 'merida',
+  diagramCoordinates: false,
 }
 
 interface SettingsStore extends AppSettings {
@@ -171,6 +180,18 @@ interface SettingsStore extends AppSettings {
   /** Switch app theme AND apply its bg/text color preset in one shot. */
   applyAppTheme: (theme: AppTheme) => void
   reset: () => void
+}
+
+/**
+ * Merge persisted state over the current (default-seeded) state so any setting
+ * added after a user first saved — e.g. `showEngineArrow` — keeps its default
+ * instead of hydrating as `undefined`. Defaults first, persisted values on top.
+ */
+export function mergeWithDefaults(
+  current: SettingsStore,
+  persisted: unknown,
+): SettingsStore {
+  return { ...current, ...(persisted as Partial<SettingsStore> | undefined) }
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -187,6 +208,9 @@ export const useSettingsStore = create<SettingsStore>()(
         })),
       reset: () => set({ ...DEFAULT }),
     }),
-    { name: 'chessreader-settings' },
+    {
+      name: 'chessreader-settings',
+      merge: (persisted, current) => mergeWithDefaults(current as SettingsStore, persisted),
+    },
   ),
 )

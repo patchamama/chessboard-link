@@ -1,5 +1,25 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useSettingsStore } from './settingsStore'
+import { useSettingsStore, mergeWithDefaults } from './settingsStore'
+
+describe('settingsStore — persistence migration', () => {
+  it('fills missing new keys from defaults (old persisted state lacks showEngineArrow)', () => {
+    const current = useSettingsStore.getState()
+    // Simulate state persisted before showEngineArrow existed (had hideEngineArrow).
+    const oldPersisted = { showEval: true, engineDepth: 22, hideEngineArrow: true }
+    const merged = mergeWithDefaults(current, oldPersisted)
+    // Missing new key takes its default (ON) — not undefined.
+    expect(merged.showEngineArrow).toBe(true)
+    // Persisted values still win for keys they define.
+    expect(merged.engineDepth).toBe(22)
+  })
+
+  it('persisted values override defaults for known keys', () => {
+    const current = useSettingsStore.getState()
+    const merged = mergeWithDefaults(current, { showEngineArrow: false, fontSize: 20 })
+    expect(merged.showEngineArrow).toBe(false)
+    expect(merged.fontSize).toBe(20)
+  })
+})
 
 describe('settingsStore — engine settings', () => {
   beforeEach(() => {
@@ -11,7 +31,7 @@ describe('settingsStore — engine settings', () => {
     expect(s.showEval).toBe(true)
     expect(s.engineDepth).toBe(30)
     expect(s.engineVariations).toBe(1)
-    expect(s.hideEngineArrow).toBe(false)
+    expect(s.showEngineArrow).toBe(true)
   })
 
   it('set patches engine fields independently', () => {
@@ -21,7 +41,7 @@ describe('settingsStore — engine settings', () => {
     expect(s.engineDepth).toBe(24)
     // untouched fields keep their defaults
     expect(s.engineVariations).toBe(1)
-    expect(s.hideEngineArrow).toBe(false)
+    expect(s.showEngineArrow).toBe(true)
   })
 
   it('reset restores engine defaults', () => {
@@ -29,14 +49,14 @@ describe('settingsStore — engine settings', () => {
       showEval: true,
       engineDepth: 30,
       engineVariations: 3,
-      hideEngineArrow: true,
+      showEngineArrow: false,
     })
     useSettingsStore.getState().reset()
     const s = useSettingsStore.getState()
     expect(s.showEval).toBe(true)
     expect(s.engineDepth).toBe(30)
     expect(s.engineVariations).toBe(1)
-    expect(s.hideEngineArrow).toBe(false)
+    expect(s.showEngineArrow).toBe(true)
   })
 })
 
