@@ -246,6 +246,12 @@ return [
         return new NotesController($storageDir);
     },
 
+    \App\Presentation\Library\BookConfigController::class => function (ContainerInterface $c) {
+        $settings   = $c->get('settings');
+        $storageDir = $settings['storage_dir'] ?? dirname(__DIR__) . '/storage';
+        return new \App\Presentation\Library\BookConfigController($storageDir);
+    },
+
     // Position Trainer
     \App\Application\Clock::class => fn() => new \App\Infrastructure\SystemClock(),
 

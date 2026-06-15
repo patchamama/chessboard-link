@@ -8,6 +8,7 @@ use App\Presentation\Diagram\DiagramController;
 use App\Presentation\Eval\EvalController;
 use App\Presentation\Health\HealthController;
 use App\Presentation\Ingestion\IngestionController;
+use App\Presentation\Library\BookConfigController;
 use App\Presentation\Library\LibraryController;
 use App\Presentation\Notes\NotesController;
 use App\Presentation\Trainer\TrainerController;
@@ -89,6 +90,13 @@ return function (App $app): void {
         $group->put('/books/{id:[0-9]+}', [LibraryController::class, 'updateBook']);
         $group->delete('/books/{id:[0-9]+}', [LibraryController::class, 'deleteBook']);
         $group->post('/books/{id:[0-9]+}/touch', [LibraryController::class, 'touch']);
+        // Per-book custom render config — READ is open to any approved user.
+        $group->get('/books/{id:[0-9]+}/config', [BookConfigController::class, 'get']);
         $group->post('/upload', [IngestionController::class, 'upload']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
+
+    // Per-book config WRITE — admin only.
+    $app->group('/api/library', function (RouteCollectorProxy $group) {
+        $group->put('/books/{id:[0-9]+}/config', [BookConfigController::class, 'save']);
+    })->add(RequireAdminMiddleware::class)->add(AuthMiddleware::class);
 };
