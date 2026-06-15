@@ -16,6 +16,7 @@ import { buildBookConfigCss } from '../utils/bookConfigCss'
 import { isMoveLine } from '../utils/isMoveLine'
 import { BookConfigEditor } from './BookConfigEditor'
 import { useAuthStore } from '../../auth/store/authStore'
+import { RecognitionErrorPanel, type FlatError } from './RecognitionErrorPanel'
 import { createRoot, type Root } from 'react-dom/client'
 import { DiagramImage } from './DiagramImage'
 import { inferDiagramFen } from '../utils/inferDiagramFen'
@@ -186,6 +187,35 @@ export default function BookReader() {
     [loadStudyPosition],
   )
 
+  // Navigate the prose to the move that triggered a recognition error. Find the
+  // first text occurrence of its written notation and scroll/flash it.
+  const navigateToError = useCallback((err: FlatError) => {
+    const container = contentRef.current
+    if (!container) return
+    setShowErrors(false)
+    const needle = err.rawSan ?? err.san
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      const idx = (node.nodeValue ?? '').indexOf(needle)
+      if (idx >= 0) {
+        const range = document.createRange()
+        range.setStart(node, idx)
+        range.setEnd(node, idx + needle.length)
+        const rect = range.getBoundingClientRect()
+        const el = (node.parentElement ?? container)
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Brief highlight flash on the surrounding element.
+        const prev = el.style.backgroundColor
+        el.style.transition = 'background-color 0.4s'
+        el.style.backgroundColor = 'rgba(251, 191, 36, 0.5)'
+        window.setTimeout(() => { el.style.backgroundColor = prev }, 1400)
+        void rect
+        return
+      }
+    }
+  }, [])
+
   // Stable refs for callbacks used inside the wrapping effect (stable deps = no re-wrap on click).
   const loadStudyNodeRef = useRef(loadStudyNode)
   const setChooserRef = useRef(setChooser)
@@ -225,6 +255,16 @@ export default function BookReader() {
     [rawHtml]
   )
   const games = useMemo(() => recognizeGames(plainText), [plainText])
+
+  // Flatten every game's recognition errors for the error panel.
+  const recognitionErrors = useMemo<FlatError[]>(
+    () =>
+      games.flatMap((g, gameIndex) =>
+        g.tree.errors.map((e) => ({ ...e, gameIndex })),
+      ),
+    [games],
+  )
+  const [showErrors, setShowErrors] = useState(false)
 
   // Keep refs in sync so the wrapping effect (stable deps) always calls latest version.
   useEffect(() => { loadStudyNodeRef.current = loadStudyNode }, [loadStudyNode])
@@ -654,6 +694,23 @@ export default function BookReader() {
             </svg>
           </button>
         )}
+
+        {/* Recognition errors — only when there are any. */}
+        {recognitionErrors.length > 0 && (
+          <button
+            onClick={() => setShowErrors(true)}
+            title={`Mostrar ${recognitionErrors.length} error(es) de reconocimiento`}
+            aria-label="Mostrar errores de reconocimiento"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-amber-300 bg-amber-50 text-amber-700 shadow-sm transition hover:bg-amber-100"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {recognitionErrors.length}
+            </span>
+          </button>
+        )}
       </nav>
 
       {/* ── TOC drawer ── */}
@@ -765,6 +822,15 @@ export default function BookReader() {
       {/* Admin book-config editor */}
       {showBookConfig && isAdmin && (
         <BookConfigEditor bookId={id} onClose={() => setShowBookConfig(false)} />
+      )}
+
+      {/* Recognition error panel */}
+      {showErrors && (
+        <RecognitionErrorPanel
+          errors={recognitionErrors}
+          onClose={() => setShowErrors(false)}
+          onNavigate={navigateToError}
+        />
       )}
     </div>
   )

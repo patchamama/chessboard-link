@@ -53,6 +53,35 @@ export interface IsolatedMove {
   charEnd?: number;
 }
 
+/**
+ * A recognition problem detected while building the tree. Surfaced to the reader
+ * so an editor can jump to the spot in the book and fix the source.
+ *
+ *  - 'missing-move'    : a move could not be placed because an EARLIER ply in its
+ *                        line is absent (e.g. "6. c4" with no 5...? before it).
+ *  - 'unreferenced'    : a numbered move that anchors to NO line (only the FIRST
+ *                        of each run is reported).
+ *  - 'wrong-number'    : a move whose written number does not match the position
+ *                        it would occupy in any candidate line.
+ */
+export type RecognitionErrorKind = 'missing-move' | 'unreferenced' | 'wrong-number';
+
+export interface RecognitionError {
+  kind: RecognitionErrorKind;
+  /** Normalised SAN of the offending move (e.g. "c4"). */
+  san: string;
+  /** Original notation as written (e.g. "♘f3", "Cf3"). */
+  rawSan?: string;
+  /** The move number written in the source for this token. */
+  moveNumber?: number;
+  color?: Color;
+  /** Human-readable explanation (Spanish, user-facing). */
+  message: string;
+  /** Source character offsets (into the normalised recognition text). */
+  charStart?: number;
+  charEnd?: number;
+}
+
 export interface GameTree {
   /** Starting FEN (standard start if null) */
   startFen: string;
@@ -64,6 +93,8 @@ export interface GameTree {
   variations: Map<string, string[][]>;
   /** Isolated prose moves: board-only square highlights, not part of the sequence. */
   isolatedMoves: IsolatedMove[];
+  /** Recognition problems detected while building this tree (for the error panel). */
+  errors: RecognitionError[];
 }
 
 export function createGameTree(startFen: string): GameTree {
@@ -73,6 +104,7 @@ export function createGameTree(startFen: string): GameTree {
     mainline: [],
     variations: new Map(),
     isolatedMoves: [],
+    errors: [],
   };
 }
 

@@ -90,17 +90,21 @@ export function tokenize(text: string): SanToken[] {
     }
   }
 
-  // Collect variation markers
+  // Collect variation markers. Parentheses, square brackets and braces all open
+  // and close an isolated variation line: ( … ), [ … ], { … }.
+  const OPENERS = '([{';
+  const CLOSERS = ')]}';
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === '(') {
+    const ch = text[i];
+    if (OPENERS.includes(ch)) {
       matches.push({
         start: i, end: i + 1,
-        token: { type: 'variation-open', raw: '(', charStart: i, charEnd: i + 1 }
+        token: { type: 'variation-open', raw: ch, charStart: i, charEnd: i + 1 }
       });
-    } else if (text[i] === ')') {
+    } else if (CLOSERS.includes(ch)) {
       matches.push({
         start: i, end: i + 1,
-        token: { type: 'variation-close', raw: ')', charStart: i, charEnd: i + 1 }
+        token: { type: 'variation-close', raw: ch, charStart: i, charEnd: i + 1 }
       });
     }
   }

@@ -67,6 +67,8 @@ interface BuildContext {
   pendingExplicitNumber: { moveNumber: number; color: 'white' | 'black' } | null;
   /** the prose analysis variation line currently being extended (node ids), or null on mainline */
   proseLine: string[] | null;
+  /** true while inside a contiguous run of illegal numbered moves (report once) */
+  inUnreferencedRun: boolean;
 }
 
 function moveKey(moveNumber: number, color: 'white' | 'black'): string {
@@ -77,6 +79,43 @@ function moveKey(moveNumber: number, color: 'white' | 'black'): string {
 function lastMainlineNode(tree: GameTree): GameNode | null {
   const lastId = tree.mainline[tree.mainline.length - 1];
   return lastId ? tree.nodes.get(lastId) ?? null : null;
+}
+
+/** Half-move index: 1.white=1, 1.black=2, 2.white=3, … — for ordering plies. */
+function plyIndex(moveNumber: number, color: 'white' | 'black'): number {
+  return (moveNumber - 1) * 2 + (color === 'white' ? 1 : 2);
+}
+
+/** The (number,color) that should immediately follow the given ply. */
+function expectedNext(
+  moveNumber: number,
+  color: 'white' | 'black',
+): { moveNumber: number; color: 'white' | 'black' } {
+  return color === 'white'
+    ? { moveNumber, color: 'black' }
+    : { moveNumber: moveNumber + 1, color: 'white' };
+}
+
+/** Derive the (moveNumber,color) of the move to be played from a FEN. */
+function expectedNumberFromFen(
+  fen: string,
+): { moveNumber: number; color: 'white' | 'black' } | null {
+  const parts = fen.split(' ');
+  if (parts.length < 6) return null;
+  const color: 'white' | 'black' = parts[1] === 'w' ? 'white' : 'black';
+  const moveNumber = parseInt(parts[5], 10);
+  if (Number.isNaN(moveNumber)) return null;
+  return { moveNumber, color };
+}
+
+/** Return `fen` with the side-to-move field set to `turn` ('w'|'b'), or null. */
+function flipTurn(fen: string, turn: 'w' | 'b'): string | null {
+  const parts = fen.split(' ');
+  if (parts.length < 2) return null;
+  parts[1] = turn;
+  // Reset en-passant target (it would be invalid after a turn flip).
+  if (parts.length >= 4) parts[3] = '-';
+  return parts.join(' ');
 }
 
 /** Can `san` be legally played from `fen`? (uses chess.js as the oracle) */
@@ -130,6 +169,7 @@ export function buildGameTree(
     maxMainlineMoveNumber: 0,
     pendingExplicitNumber: null,
     proseLine: null,
+    inUnreferencedRun: false,
   };
 
   for (const token of tokens) {
@@ -272,7 +312,55 @@ export function buildGameTree(
     }
 
     const parentId = ctx.currentNodeId;
-    const fenBeforeMove = ctx.chess.fen();
+    let fenBeforeMove = ctx.chess.fen();
+
+    // ── Contiguity check (number is law) ───────────────────────────────────
+    // On the mainline, the written (number,color) must be the immediate
+    // successor of the tip. A forward gap means an earlier ply is missing in the
+    // source. The skipped ply also flips the side to move, so the move would be
+    // rejected as "wrong turn"; flip the FEN's turn so the move can still be
+    // placed (the gap is recorded for the editor).
+    if (
+      !inParen &&
+      ctx.proseLine === null &&
+      token.moveNumber !== undefined &&
+      token.color
+    ) {
+      const tip = lastMainlineNode(tree);
+      if (tip) {
+        const exp = expectedNext(tip.moveNumber, tip.color);
+        const tokenPly = plyIndex(token.moveNumber, token.color);
+        const expPly = plyIndex(exp.moveNumber, exp.color);
+        // Only flag a missing-move when the move is actually PLACEABLE after the
+        // gap (legal directly, or legal once the side-to-move is flipped). If it
+        // is illegal either way it is an unreferenced move, reported below.
+        const wantTurn = token.color === 'white' ? 'w' : 'b';
+        const needsFlip = !fenBeforeMove.includes(` ${wantTurn} `);
+        const flipped = needsFlip ? flipTurn(fenBeforeMove, wantTurn) : fenBeforeMove;
+        const placeableAfterGap =
+          (!needsFlip && isLegalFrom(fenBeforeMove, san)) ||
+          (needsFlip && flipped !== null && isLegalFrom(flipped, san));
+        if (tokenPly > expPly && placeableAfterGap) {
+          tree.errors.push({
+            kind: 'missing-move',
+            san,
+            ...(token.rawSan ? { rawSan: token.rawSan } : {}),
+            moveNumber: token.moveNumber,
+            color: token.color,
+            message: `Falta una jugada antes de ${token.moveNumber}${token.color === 'black' ? '...' : '.'} ${san} (la secuencia salta de ${tip.moveNumber}${tip.color === 'black' ? '...' : '.'} a ${token.moveNumber}).`,
+            ...(token.charStart !== undefined
+              ? { charStart: token.charStart, charEnd: token.charEnd }
+              : {}),
+          });
+          // Place the move after the hole using the flipped position if needed.
+          if (needsFlip && flipped !== null) {
+            ctx.chess.load(flipped);
+            fenBeforeMove = flipped;
+          }
+        }
+      }
+    }
+
     const parentFen = fenBeforeMove;
 
     let moveResult: ReturnType<Chess['move']> | null = null;
@@ -306,11 +394,48 @@ export function buildGameTree(
     tree.nodes.set(nodeId, node);
 
     if (isInvalid) {
+      // An illegal numbered move anchors to no line. Report only the FIRST of a
+      // contiguous run of such moves; the run resets once a valid move lands.
+      if (token.moveNumber !== undefined && !ctx.inUnreferencedRun) {
+        ctx.inUnreferencedRun = true;
+        tree.errors.push({
+          kind: 'unreferenced',
+          san: node.san,
+          ...(node.rawSan ? { rawSan: node.rawSan } : {}),
+          moveNumber: token.moveNumber,
+          ...(token.color ? { color: token.color } : {}),
+          message: `Jugada con número sin referencia válida: ${token.moveNumber}${token.color === 'black' ? '...' : '.'} ${node.san} (no continúa ninguna línea legal).`,
+          ...(node.charStart !== undefined
+            ? { charStart: node.charStart, charEnd: node.charEnd }
+            : {}),
+        });
+      }
       ctx.dead = true;
       continue;
     }
+    // A valid move ends any unreferenced run.
+    ctx.inUnreferencedRun = false;
 
     if (inParen) {
+      // Inside a variation, the written number must match the position the move
+      // occupies in the line (derived from the parent FEN's fullmove + side). A
+      // mismatch is a wrong-number error (the number contradicts the position).
+      if (token.moveNumber !== undefined && token.color) {
+        const expected = expectedNumberFromFen(parentFen);
+        if (expected && (expected.moveNumber !== token.moveNumber || expected.color !== token.color)) {
+          tree.errors.push({
+            kind: 'wrong-number',
+            san: node.san,
+            ...(node.rawSan ? { rawSan: node.rawSan } : {}),
+            moveNumber: token.moveNumber,
+            color: token.color,
+            message: `El número ${token.moveNumber}${token.color === 'black' ? '...' : '.'} no corresponde a la posición de la variante (debería ser ${expected.moveNumber}${expected.color === 'black' ? '...' : '.'}) para ${node.san}.`,
+            ...(node.charStart !== undefined
+              ? { charStart: node.charStart, charEnd: node.charEnd }
+              : {}),
+          });
+        }
+      }
       // Parenthesised variation: each '(' owns one line under its branch point,
       // created lazily on the first move so empty/nested parens don't collide.
       const stackTop = ctx.variationStack[ctx.variationStack.length - 1];
@@ -322,7 +447,7 @@ export function buildGameTree(
       // Re-anchored prose analysis line.
       ctx.proseLine.push(nodeId);
     } else {
-      // Mainline.
+      // Mainline (contiguity already validated above before the move was played).
       tree.mainline.push(nodeId);
       ctx.mainlineByKey.set(moveKey(node.moveNumber, node.color), nodeId);
       if (node.moveNumber > ctx.maxMainlineMoveNumber) {
