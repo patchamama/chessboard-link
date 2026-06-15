@@ -18,6 +18,7 @@ export type TokenType =
   | 'variation-open'  // (
   | 'variation-close' // )
   | 'annotation'     // !, ?, etc. standalone
+  | 'paragraph-break' // a newline / paragraph boundary in the source
   | 'result';        // 1-0, 0-1, 1/2-1/2, *
 
 export interface SanToken {
@@ -35,6 +36,12 @@ export interface SanToken {
   rawSan?: string;
   /** Determined by context: color of the move that follows this move-number */
   color?: 'white' | 'black';
+  /**
+   * true when this token is the FIRST move-ish token of its paragraph/line, i.e.
+   * a paragraph break (newline) precedes it with no intervening move. The reader
+   * uses this as a strong signal that a move-number here resumes the mainline.
+   */
+  atParagraphStart?: boolean;
   /**
    * true when this move token is NOT a reproducible game move: it is an isolated
    * SAN-looking token in prose (e.g. "—d5—", "la casilla e4") that is not chained
@@ -68,6 +75,20 @@ export function tokenize(text: string): SanToken[] {
 
   type RawMatch = { start: number; end: number; token: SanToken };
   const matches: RawMatch[] = [];
+
+  // Collect paragraph breaks (newlines). Consecutive newlines collapse into one
+  // break token. These mark where a new paragraph/line begins in the source.
+  {
+    const re = /\n+/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      matches.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        token: { type: 'paragraph-break', raw: m[0], charStart: m.index, charEnd: m.index + m[0].length },
+      });
+    }
+  }
 
   // Collect variation markers
   for (let i = 0; i < text.length; i++) {
@@ -173,20 +194,54 @@ export function tokenize(text: string): SanToken[] {
   // chainEnd = charEnd of the last chained token, or null when the chain is dead.
   let chainEnd: number | null = null;
   const chainStack: Array<number | null> = [];
+  // charEnd of the most recent paragraph-break, or null once consumed. Used to
+  // verify the NEXT move-ish token sits at the real start of the paragraph (only
+  // whitespace/punctuation between the break and the token — no prose words).
+  let paragraphBreakEnd: number | null = null;
+  // Set when a paragraph-leading move-number was seen, to also flag its move.
+  let carryParagraphStart = false;
 
   const chained = (start: number): boolean =>
     chainEnd !== null && start - chainEnd <= MAX_CHAIN_GAP;
 
+  // A token leads its paragraph only if everything between the break and the
+  // token is non-letter (spaces, digits-as-part-of-number handled separately,
+  // punctuation) — i.e. no prose words precede it on that line.
+  const leadsParagraph = (tokenStart: number): boolean => {
+    if (paragraphBreakEnd === null) return false;
+    const between = text.slice(paragraphBreakEnd, tokenStart);
+    return !/[A-Za-zÀ-ÿ]/.test(between);
+  };
+
   for (const { token } of nonOverlapping) {
+    if (token.type === 'paragraph-break') {
+      // A newline breaks the reproducibility chain (a move after a newline is in
+      // a new paragraph, not glued to the previous token).
+      paragraphBreakEnd = token.charEnd;
+      chainEnd = null;
+      // Not emitted into the token stream — it is a positional signal only.
+      continue;
+    }
     if (token.type === 'move-number') {
       currentMoveNumber = token.moveNumber!;
       nextColor = token.isEllipsis ? 'black' : 'white';
+      if (leadsParagraph(token.charStart)) {
+        token.atParagraphStart = true;
+        // Carry the flag onto the first move of this number too.
+        carryParagraphStart = true;
+      }
+      paragraphBreakEnd = null;
       // A move-number always seeds/keeps the chain alive.
       chainEnd = token.charEnd;
       tokens.push(token);
     } else if (token.type === 'move') {
       token.moveNumber = currentMoveNumber;
       token.color = nextColor;
+      if (leadsParagraph(token.charStart) || carryParagraphStart) {
+        token.atParagraphStart = true;
+        carryParagraphStart = false;
+      }
+      paragraphBreakEnd = null;
       nextColor = nextColor === 'white' ? 'black' : 'white';
       if (chained(token.charStart)) {
         chainEnd = token.charEnd;
@@ -196,6 +251,9 @@ export function tokenize(text: string): SanToken[] {
       }
       tokens.push(token);
     } else if (token.type === 'variation-open') {
+      // A paren between a paragraph-leading number and its move cancels the carry.
+      carryParagraphStart = false;
+      paragraphBreakEnd = null;
       // The paren inherits the chain only if it opens adjacent to a live chain.
       chainStack.push(chainEnd);
       chainEnd = chained(token.charStart) ? token.charEnd : null;

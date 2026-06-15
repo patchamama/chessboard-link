@@ -207,8 +207,21 @@ export default function BookReader() {
         (_m, attr, _d, imgPath) => `${attr}="/api/library/books/${id}/images/${imgPath}"`)
   }, [rawHtml, id])
 
+  // Flatten HTML to text for move recognition. Block-level boundaries become
+  // NEWLINES so the recognizer can use "a move that starts a paragraph resumes
+  // the mainline" (its strongest mainline signal). Inline tags become spaces.
   const plainText = useMemo(
-    () => rawHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    () =>
+      rawHtml
+        // Close/open of block elements → a paragraph break.
+        .replace(/<\/(p|div|h[1-6]|li|blockquote|tr|section|article)\s*>/gi, '\n')
+        .replace(/<(br|hr)\s*\/?>/gi, '\n')
+        // Any remaining tag → a single space.
+        .replace(/<[^>]+>/g, ' ')
+        // Collapse spaces/tabs but PRESERVE newlines; collapse runs of newlines.
+        .replace(/[^\S\n]+/g, ' ')
+        .replace(/ *\n+ */g, '\n')
+        .trim(),
     [rawHtml]
   )
   const games = useMemo(() => recognizeGames(plainText), [plainText])

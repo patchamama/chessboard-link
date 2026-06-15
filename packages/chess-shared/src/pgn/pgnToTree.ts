@@ -73,6 +73,12 @@ function moveKey(moveNumber: number, color: 'white' | 'black'): string {
   return `${moveNumber}:${color}`;
 }
 
+/** The last (tip) node of the mainline, or null if the mainline is empty. */
+function lastMainlineNode(tree: GameTree): GameNode | null {
+  const lastId = tree.mainline[tree.mainline.length - 1];
+  return lastId ? tree.nodes.get(lastId) ?? null : null;
+}
+
 /** Can `san` be legally played from `fen`? (uses chess.js as the oracle) */
 function isLegalFrom(fen: string, san: string): boolean {
   try {
@@ -91,6 +97,23 @@ export function buildGameTree(
   resetNodeCounter();
   const tree = createGameTree(startFen);
   const chess = new Chess(startFen);
+
+  // Lookahead: a move that does NOT lead a paragraph but whose (number,color) is
+  // RE-STATED later by a move that DOES lead a paragraph is an embedded prose
+  // alternative — the paragraph-leading restatement is the real mainline move.
+  // Mark these so they don't extend the mainline.
+  const paragraphLeadKeys = new Set<string>();
+  for (const t of tokens) {
+    if (t.type === 'move' && !t.isolated && t.atParagraphStart && t.moveNumber !== undefined && t.color) {
+      paragraphLeadKeys.add(moveKey(t.moveNumber, t.color));
+    }
+  }
+  const supersededByParagraph = (t: SanToken): boolean =>
+    t.type === 'move' &&
+    !t.atParagraphStart &&
+    t.moveNumber !== undefined &&
+    !!t.color &&
+    paragraphLeadKeys.has(moveKey(t.moveNumber, t.color));
 
   const ctx: BuildContext = {
     chess,
@@ -178,6 +201,14 @@ export function buildGameTree(
     const san = token.san!;
     const inParen = ctx.variationStack.length > 0;
 
+    // ── Embedded move superseded by a later paragraph-leading restatement ──
+    // "podían jugar 3...Nf6 …" mid-prose, then "3...a6" leading a new paragraph:
+    // the embedded 3...Nf6 is the unplayed alternative. Drop off the mainline so
+    // it becomes a variation; the real move resumes via the paragraph rule.
+    if (!inParen && ctx.onMainline && supersededByParagraph(token)) {
+      ctx.onMainline = false;
+    }
+
     // ── Backtracked move-number on the mainline ────────────────────────────
     // Opening theory written in prose never emits a result token, yet still
     // introduces alternatives: "3. Nc3 Bb4 ... Si las blancas jugaban 3. Nf3".
@@ -194,6 +225,28 @@ export function buildGameTree(
       const regresses = explicit.moveNumber < ctx.maxMainlineMoveNumber;
       if (restatesPly || regresses) {
         ctx.onMainline = false;
+      }
+    }
+
+    // ── Paragraph-leading move resumes the mainline (signal + validation) ──
+    // The user's key rule: mainline moves almost always start a paragraph. If we
+    // drifted into prose-analysis mode but now see a move that (a) begins a new
+    // paragraph, (b) advances the move number past the mainline tip, and (c) is
+    // legal as the continuation of the mainline tip, then it RESUMES the
+    // mainline — it is not part of the preceding embedded variation.
+    if (!inParen && !ctx.onMainline && token.atParagraphStart) {
+      const tip = lastMainlineNode(tree);
+      const tipFen = tip ? tip.fen : tree.startFen;
+      const advances =
+        (token.moveNumber ?? 0) >= ctx.maxMainlineMoveNumber;
+      if (advances && isLegalFrom(tipFen, san)) {
+        ctx.onMainline = true;
+        ctx.proseLine = null;
+        ctx.chess.load(tipFen);
+        ctx.currentNodeId = tip ? tip.id : null;
+        ctx.fenBeforeLastMove = tipFen;
+        ctx.parentBeforeLastMove = tip ? tip.parentId : null;
+        ctx.dead = false;
       }
     }
 
