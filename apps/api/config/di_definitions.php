@@ -246,6 +246,51 @@ return [
         return new NotesController($storageDir);
     },
 
+    // Position Trainer
+    \App\Application\Clock::class => fn() => new \App\Infrastructure\SystemClock(),
+
+    \App\Domain\Trainer\Sm2Scheduler::class => fn() => new \App\Domain\Trainer\Sm2Scheduler(),
+
+    \App\Domain\Trainer\TrainerLineRepository::class => function (ContainerInterface $c) {
+        return new \App\Infrastructure\Persistence\DbalTrainerLineRepository($c->get(Connection::class));
+    },
+
+    \App\Application\Trainer\AddTrainerLineHandler::class => function (ContainerInterface $c) {
+        return new \App\Application\Trainer\AddTrainerLineHandler(
+            $c->get(\App\Domain\Trainer\TrainerLineRepository::class),
+            $c->get(\App\Application\Clock::class),
+        );
+    },
+
+    \App\Application\Trainer\ListTrainerLinesHandler::class => function (ContainerInterface $c) {
+        return new \App\Application\Trainer\ListTrainerLinesHandler(
+            $c->get(\App\Domain\Trainer\TrainerLineRepository::class),
+        );
+    },
+
+    \App\Application\Trainer\ReviewTrainerLineHandler::class => function (ContainerInterface $c) {
+        return new \App\Application\Trainer\ReviewTrainerLineHandler(
+            $c->get(\App\Domain\Trainer\TrainerLineRepository::class),
+            $c->get(\App\Domain\Trainer\Sm2Scheduler::class),
+            $c->get(\App\Application\Clock::class),
+        );
+    },
+
+    \App\Application\Trainer\DeleteTrainerLineHandler::class => function (ContainerInterface $c) {
+        return new \App\Application\Trainer\DeleteTrainerLineHandler(
+            $c->get(\App\Domain\Trainer\TrainerLineRepository::class),
+        );
+    },
+
+    \App\Presentation\Trainer\TrainerController::class => function (ContainerInterface $c) {
+        return new \App\Presentation\Trainer\TrainerController(
+            $c->get(\App\Application\Trainer\AddTrainerLineHandler::class),
+            $c->get(\App\Application\Trainer\ListTrainerLinesHandler::class),
+            $c->get(\App\Application\Trainer\ReviewTrainerLineHandler::class),
+            $c->get(\App\Application\Trainer\DeleteTrainerLineHandler::class),
+        );
+    },
+
     \App\Application\Ingestion\Port\HtmlFetcher::class => fn(ContainerInterface $c) => $c->get(GuzzleHtmlFetcher::class),
 
     ZipEpubExtractor::class  => fn() => new ZipEpubExtractor(),

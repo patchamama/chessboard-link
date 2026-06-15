@@ -10,6 +10,7 @@ use App\Presentation\Health\HealthController;
 use App\Presentation\Ingestion\IngestionController;
 use App\Presentation\Library\LibraryController;
 use App\Presentation\Notes\NotesController;
+use App\Presentation\Trainer\TrainerController;
 use App\Presentation\Recognition\RecognitionController;
 use App\Presentation\Webparser\WebparserController;
 use App\Presentation\Middleware\AuthMiddleware;
@@ -45,6 +46,14 @@ return function (App $app): void {
     $app->group('/api/notes', function (RouteCollectorProxy $group) {
         $group->get('', [NotesController::class, 'get']);
         $group->put('', [NotesController::class, 'save']);
+    })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
+
+    // Position Trainer routes (spaced repetition; require JWT + Approved)
+    $app->group('/api/trainer', function (RouteCollectorProxy $group) {
+        $group->get('/lines', [TrainerController::class, 'list']);
+        $group->post('/lines', [TrainerController::class, 'add']);
+        $group->post('/lines/{id:[0-9]+}/review', [TrainerController::class, 'review']);
+        $group->delete('/lines/{id:[0-9]+}', [TrainerController::class, 'delete']);
     })->add(RequireApprovedMiddleware::class)->add(AuthMiddleware::class);
 
     // Recognition route (require JWT + Approved)

@@ -13,6 +13,11 @@ import { EngineEvalPanel } from './EngineEvalPanel'
 import { useEngineLines } from '../../../shared/stockfish/useEngineLines'
 import { buildBoardArrows, ENGINE_ARROW_COLOR, PREMOVE_ARROW_COLOR } from '../utils/engineArrows'
 import { useMoveSound } from '../../../shared/chess/useMoveSound'
+import { GuessTheMove } from './GuessTheMove'
+import { PositionTrainer } from './PositionTrainer'
+import { usePracticeStore } from '../store/practiceStore'
+import { trainerLineFromNode } from '../utils/trainerLineFromNode'
+import { addTrainerLine } from '../api/trainerApi'
 import type { Arrow } from 'react-chessboard'
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -111,6 +116,26 @@ export function StudyBoard() {
   const nav = useStudyNavigation()
   const [showChooser, setShowChooser] = useState(false)
   const [fenInput, setFenInput] = useState(INITIAL_FEN)
+
+  const practiceActive = usePracticeStore((s) => s.active)
+  const startPractice = usePracticeStore((s) => s.start)
+  const currentNodeId = useStudyBoardStore((s) => s.currentNodeId)
+
+  const [showTrainer, setShowTrainer] = useState(false)
+  const [addedToTrainer, setAddedToTrainer] = useState(false)
+
+  const handleAddToTrainer = async () => {
+    if (!activeGame) return
+    const draft = trainerLineFromNode(activeGame, currentNodeId)
+    if (draft.movesUci.length === 0) return
+    try {
+      await addTrainerLine({ name: '', ...draft })
+      setAddedToTrainer(true)
+      window.setTimeout(() => setAddedToTrainer(false), 2000)
+    } catch {
+      /* ignore — best effort */
+    }
+  }
 
   // An isolated move only overlays a PIECE when the notation names one (Nb5, Bf3).
   // A bare pawn move (e4, d5) specifies no piece, so we only highlight the square
@@ -280,10 +305,50 @@ export function StudyBoard() {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">Study Board</p>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {practiceActive ? 'Guess the Move' : showTrainer ? 'Position Trainer' : 'Study Board'}
+        </p>
+        {!practiceActive && (
+          <div className="flex items-center gap-1.5">
+            {activeGame && (
+              <>
+                <button
+                  onClick={handleAddToTrainer}
+                  title="Save the line from the current move for spaced-repetition review"
+                  className="rounded border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  {addedToTrainer ? 'Added ✓' : '+ Trainer'}
+                </button>
+                <button
+                  onClick={() => startPractice(activeGame, currentNodeId)}
+                  title="Hide upcoming moves and guess them from the current position"
+                  className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-600 transition hover:bg-indigo-50"
+                >
+                  Guess the Move
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowTrainer((v) => !v)}
+              title="Toggle the Position Trainer"
+              className={`rounded border px-2 py-0.5 text-xs font-medium transition ${
+                showTrainer
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Trainer
+            </button>
+          </div>
+        )}
+      </div>
+
+      {practiceActive && <GuessTheMove />}
+      {!practiceActive && showTrainer && <PositionTrainer />}
 
       {/* Board + eval bar — layout depends on eval bar direction */}
-      {evalDirection === 'vertical' ? (
+      {!practiceActive && !showTrainer && (evalDirection === 'vertical' ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-stretch gap-1">
             <EvalBar fen={fen} direction="vertical" score={evalBarScore} />
@@ -299,7 +364,7 @@ export function StudyBoard() {
           {statusRow}
           {evalPanel}
         </div>
-      )}
+      ))}
 
       {/* Navigation bar */}
       <div className="relative flex items-center gap-1.5">
