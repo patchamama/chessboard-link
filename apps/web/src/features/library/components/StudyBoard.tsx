@@ -86,7 +86,7 @@ function NavButton({
 export function StudyBoard() {
   const evalDirection = useSettingsStore((s) => s.evalBarDirection)
   const showEval = useSettingsStore((s) => s.showEval)
-  const hideEngineArrow = useSettingsStore((s) => s.hideEngineArrow)
+  const showEngineArrow = useSettingsStore((s) => s.showEngineArrow)
   const autoplayDelay = useSettingsStore((s) => s.autoplayDelay)
   const playMoveSound = useMoveSound()
 
@@ -159,7 +159,7 @@ export function StudyBoard() {
   const boardArrows = buildBoardArrows({
     userArrows: annotations.arrows,
     showEval,
-    hideEngineArrow,
+    showEngineArrow,
     bestMoveUci: engine.bestMove,
     nextMove,
   })
