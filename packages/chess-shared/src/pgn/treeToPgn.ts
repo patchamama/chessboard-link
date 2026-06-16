@@ -10,19 +10,24 @@ import { type GameTree, type GameNode } from '../model/gameTree.js';
 /** Format one ply's number prefix: "5." for white, "5..." for black. */
 function numberPrefix(node: GameNode, forceBlackDots: boolean): string {
   if (node.color === 'white') return `${node.moveNumber}. `;
-  // Black move: only print "N..." when it starts a line/variation or follows a
-  // variation; otherwise the preceding white move already implied the number.
+  // Black move: only print "N..." when it starts a line/variation; otherwise the
+  // preceding white move already implied the number.
   return forceBlackDots ? `${node.moveNumber}... ` : '';
 }
 
 export function treeToPgn(tree: GameTree): string {
   const out: string[] = [];
+  // Guard against cycles / double emission: each variation line is emitted once.
+  const emitted = new Set<string[]>();
 
-  // Emit one line of node ids. Variations anchored at a node N are alternatives
-  // to the NEXT move in this line (they share N as parent), so they print right
-  // after that next move — "2. Nf3 (2. f4 exf4) 2... Nc6". `anchorBefore` is the
-  // parent id whose variations should fire after THIS node.
+  // Emit one line of node ids. After each move, print the variation lines that
+  // branch from THAT node (its parent-keyed alternatives are handled by the move
+  // they replace — see below). `anchorBefore` is the key whose lines are the
+  // alternatives to the FIRST move of this line.
   const emitLine = (ids: string[], startsLine: boolean, anchorBefore: string | null) => {
+    if (emitted.has(ids)) return;
+    emitted.add(ids);
+
     let needNumber = startsLine;
     ids.forEach((id, i) => {
       const node = tree.nodes.get(id);
@@ -31,13 +36,24 @@ export function treeToPgn(tree: GameTree): string {
       out.push(numberPrefix(node, forceDots) + (node.rawSan ?? node.san));
       needNumber = false;
 
-      // Variations whose parent is this node's parent are alternatives to THIS
-      // move; print them now (skip the line that is this node's own).
-      const altKey = (i === 0 ? anchorBefore : ids[i - 1]) ?? (node.parentId ?? 'root');
-      const alts = (tree.variations.get(altKey) ?? []).filter((line) => line[0] !== id);
-      for (const line of alts) {
+      // Variations stored under key K replace the child of K, so alternatives to
+      // THIS move hang off this move's PARENT — print them after this move.
+      const altKey = node.parentId ?? 'root';
+      const altLines = (tree.variations.get(altKey) ?? []).filter(
+        (line) => line !== ids && !emitted.has(line) && line[0] !== id,
+      );
+      // Sub-variations keyed by THIS node replace this node's child. If the next
+      // node in THIS line is that child, it will print them as its own altLines,
+      // so only emit them here when this is the last node of the line (no child
+      // present to carry them) — this avoids printing them before the child.
+      const isLast = i === ids.length - 1;
+      const subLines = isLast
+        ? (tree.variations.get(id) ?? []).filter((line) => line !== ids && !emitted.has(line))
+        : [];
+
+      for (const line of [...altLines, ...subLines]) {
         out.push('(');
-        emitLine(line, true, altKey === 'root' ? null : altKey);
+        emitLine(line, true, null);
         out.push(')');
         needNumber = true;
       }
@@ -46,7 +62,6 @@ export function treeToPgn(tree: GameTree): string {
 
   emitLine(tree.mainline, true, null);
 
-  // Join, then tidy spaces around parentheses.
   return out
     .join(' ')
     .replace(/\(\s+/g, '(')
