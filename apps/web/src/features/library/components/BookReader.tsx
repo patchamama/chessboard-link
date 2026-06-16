@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useChapter, useTouchBook } from '../api/libraryApi'
 import { recognizeGames, figurineToAscii } from '@chess-ebook/chess-shared'
 import type { GameTree, GameNode, IsolatedMove } from '@chess-ebook/chess-shared'
-import { Chessboard } from 'react-chessboard'
+import ChessBoardThemed from '../../../shared/chess/ChessBoard'
 import { StudyBoard } from './StudyBoard'
 import { StudyPanelResizer } from './StudyPanelResizer'
 import { VariationChooser } from './VariationChooser'
@@ -54,6 +54,7 @@ interface MoveTooltip {
   top: number
   left: number
   fen: string
+  lastMove: { from: string; to: string } | null
 }
 
 interface ResolvedNode {
@@ -85,23 +86,32 @@ type ResolvedSan =
  * playable move. Here every occurrence (node or isolated), across all games, is
  * merged into ONE list per SAN, ordered by charStart, and handed out in order.
  */
-function createSanResolver(games: ReturnType<typeof recognizeGames>) {
-  type Entry = { charStart: number; resolved: ResolvedSan }
+export function createSanResolver(games: ReturnType<typeof recognizeGames>) {
+  type Entry = {
+    charStart: number
+    resolved: ResolvedSan
+    /** For node entries: the authoritative move number/color from the tree. */
+    moveNumber?: number
+    color?: 'white' | 'black'
+  }
   const bySan = new Map<string, Entry[]>()
 
-  const push = (san: string, charStart: number, resolved: ResolvedSan) => {
+  const push = (san: string, charStart: number, resolved: ResolvedSan, moveNumber?: number, color?: 'white' | 'black') => {
     const list = bySan.get(san) ?? []
-    list.push({ charStart, resolved })
+    list.push({ charStart, resolved, moveNumber, color })
     bySan.set(san, list)
   }
 
   games.forEach((game, gameIndex) => {
     for (const node of game.tree.nodes.values()) {
       if (!node.fen || node.invalid) continue
-      push(node.san, node.charStart ?? 0, {
-        kind: 'node',
-        value: { tree: game.tree, node, gameIndex },
-      })
+      push(
+        node.san,
+        node.charStart ?? 0,
+        { kind: 'node', value: { tree: game.tree, node, gameIndex } },
+        node.moveNumber,
+        node.color,
+      )
     }
     for (const iso of game.tree.isolatedMoves) {
       push(cleanSan(iso.san), iso.charStart ?? 0, { kind: 'iso', value: iso })
@@ -112,16 +122,31 @@ function createSanResolver(games: ReturnType<typeof recognizeGames>) {
   // sequence matches the DOM walk order.
   for (const list of bySan.values()) list.sort((a, b) => a.charStart - b.charStart)
 
-  const cursor = new Map<string, number>()
+  // Track which entries are already consumed (so each node maps to ONE DOM span).
+  const used = new Set<Entry>()
   return {
-    /** consume the next recognised occurrence for this SAN in source order */
-    next(asciiSan: string): ResolvedSan | null {
+    /**
+     * Resolve a DOM occurrence of `asciiSan` to a recognised entry. THE NUMBER IS
+     * AUTHORITATIVE: when the DOM token carries a move number (e.g. "9..."), only
+     * a node with that exact (moveNumber,color) may match — this prevents a
+     * "11... Nb6" in prose from being painted as the mainline "9... Nb6". When no
+     * number is present, fall back to next-in-source-order.
+     */
+    nextKeyed(asciiSan: string, moveNumber: number | null, color: 'white' | 'black' | null): ResolvedSan | null {
       const list = bySan.get(asciiSan)
       if (!list || list.length === 0) return null
-      const i = cursor.get(asciiSan) ?? 0
-      cursor.set(asciiSan, i + 1)
-      if (i >= list.length) return null
-      return list[i].resolved
+      if (moveNumber !== null && color !== null) {
+        // Exact (number,color) match, first unused, in source order.
+        const hit = list.find(
+          (e) => !used.has(e) && e.moveNumber === moveNumber && e.color === color,
+        )
+        if (hit) { used.add(hit); return hit.resolved }
+        return null // numbered token with no matching node → leave as plain text
+      }
+      // No number on the DOM token: next unused in order (isolated/bare moves).
+      const next = list.find((e) => !used.has(e))
+      if (next) { used.add(next); return next.resolved }
+      return null
     },
   }
 }
@@ -381,7 +406,12 @@ export default function BookReader() {
             frag.appendChild(document.createTextNode(text.slice(cursor, match.start)))
           }
           const ascii = cleanSan(match.san)
-          const resolved = resolver.next(ascii)
+          // Extract the move number/color from the wrapped token ("9... ♘b6" →
+          // 9, black). The NUMBER is authoritative for the match.
+          const numM = /^(\d+)(\.\.\.|\.)/.exec(match.wrapText.trim())
+          const moveNumber = numM ? parseInt(numM[1], 10) : null
+          const color: 'white' | 'black' | null = numM ? (numM[2] === '...' ? 'black' : 'white') : null
+          const resolved = resolver.nextKeyed(ascii, moveNumber, color)
 
           if (!resolved) {
             // Neither a game move nor isolated — leave as plain text.
@@ -417,6 +447,8 @@ export default function BookReader() {
           span.setAttribute('data-game-index', String(rn.gameIndex))
           span.setAttribute('data-has-alt', hasAlt ? '1' : '0')
           span.setAttribute('data-fen', rn.node.fen)
+          if (rn.node.from) span.setAttribute('data-from', rn.node.from)
+          if (rn.node.to) span.setAttribute('data-to', rn.node.to)
           span.textContent = match.wrapText
           // Inactive base styling; the active highlight is applied separately.
           const baseClass =
@@ -522,9 +554,16 @@ export default function BookReader() {
       const fen = span.dataset.fen
       if (!fen) return
       if (tooltipTimer.current) clearTimeout(tooltipTimer.current)
+      const from = span.dataset.from
+      const to = span.dataset.to
       tooltipTimer.current = setTimeout(() => {
         const rect = span.getBoundingClientRect()
-        setTooltipRef.current({ top: rect.bottom + 6, left: rect.left, fen })
+        setTooltipRef.current({
+          top: rect.bottom + 6,
+          left: rect.left,
+          fen,
+          lastMove: from && to ? { from, to } : null,
+        })
       }, 200)
     }
 
@@ -820,7 +859,9 @@ export default function BookReader() {
           onMouseEnter={() => { if (tooltipTimer.current) clearTimeout(tooltipTimer.current) }}
           onMouseLeave={() => { if (tooltipTimer.current) clearTimeout(tooltipTimer.current); setTooltip(null) }}
         >
-          <Chessboard options={{ position: tooltip.fen, boardStyle: { width: 220, height: 220 }, allowDragging: false, showAnimations: false }} />
+          <div style={{ width: 220 }}>
+            <ChessBoardThemed fen={tooltip.fen} orientation="white" lastMove={tooltip.lastMove} hideLabels />
+          </div>
         </div>
       )}
 

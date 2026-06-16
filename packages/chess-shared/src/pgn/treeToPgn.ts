@@ -64,14 +64,18 @@ export function treeToPgn(tree: GameTree, options: TreeToPgnOptions = {}): strin
         : [];
 
       for (const line of [...altLines, ...subLines]) {
-        if (multiline) {
-          tokens.push('\n' + indent(depth + 1) + '(');
-        } else {
-          tokens.push('(');
-        }
+        // Re-check here: an earlier line in this loop may have emitted it. Without
+        // this, emitLine returns early and leaves an empty "()".
+        if (emitted.has(line) || line.length === 0) continue;
+        const before = tokens.length;
+        tokens.push(multiline ? '\n' + indent(depth + 1) + '(' : '(');
         emitLine(line, true, depth + 1);
-        tokens.push(')');
-        needNumber = true;
+        if (tokens.length === before + 1) {
+          tokens.pop(); // nothing emitted → drop the empty parens
+        } else {
+          tokens.push(')');
+          needNumber = true;
+        }
       }
     });
   };

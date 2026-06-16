@@ -31,6 +31,8 @@ interface ChessBoardProps {
   selectedSquare?: string | null
   /** Legal destination squares to highlight as move dots. */
   legalTargets?: string[]
+  /** Force-hide coordinate labels regardless of the global setting (thumbnails). */
+  hideLabels?: boolean
 }
 
 const HIGHLIGHT_STYLE: CSSProperties = {
@@ -66,10 +68,11 @@ export default function ChessBoard({
   onPieceDrop,
   selectedSquare,
   legalTargets,
+  hideLabels,
 }: ChessBoardProps) {
   const boardTheme = useSettingsStore((s) => s.boardTheme)
   const pieceTheme = useSettingsStore((s) => s.pieceTheme)
-  const showBoardLabels = useSettingsStore((s) => s.showBoardLabels)
+  const showBoardLabels = useSettingsStore((s) => s.showBoardLabels) && !hideLabels
   const fullSquareHighlight = useSettingsStore((s) => s.fullSquareHighlight)
   const theme = BOARD_THEMES[boardTheme]
   const pieces = getPieceSet(pieceTheme)

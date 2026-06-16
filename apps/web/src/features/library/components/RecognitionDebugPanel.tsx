@@ -68,10 +68,29 @@ function tokenizeTree(tree: GameTree, multiline: boolean): PgnToken[] {
         ? (tree.variations.get(id) ?? []).filter((l) => l.length > 0 && l !== ids && !emitted.has(l))
         : []
 
+      let emittedAny = false
       for (const line of [...altLines, ...subLines]) {
+        // Re-check emitted RIGHT HERE: an earlier line in this same loop may have
+        // emitted it, which would otherwise leave an empty "()".
+        if (emitted.has(line) || line.length === 0) continue
+        const before = out.length
         out.push({ kind: 'punct', text: multiline ? `\n${'   '.repeat(depth + 1)}(` : '(' })
         walk(line, true, depth + 1)
-        out.push({ kind: 'punct', text: ')' })
+        // If walk produced nothing (all nodes missing), drop the empty parens.
+        if (out.length === before + 1) {
+          out.pop()
+        } else {
+          out.push({ kind: 'punct', text: ')' })
+          needNumber = true
+          emittedAny = true
+        }
+      }
+
+      // In multiline mode, after a variation closes, resume THIS line on a new
+      // line at its own depth (mainline = no margin), so main moves are flush
+      // left and variations sit indented. Only if more moves follow.
+      if (multiline && emittedAny && i < ids.length - 1) {
+        out.push({ kind: 'punct', text: `\n${'   '.repeat(depth)}` })
         needNumber = true
       }
     })
@@ -80,18 +99,33 @@ function tokenizeTree(tree: GameTree, multiline: boolean): PgnToken[] {
   return out
 }
 
-/** Floating board thumbnail anchored near the cursor. */
-function Thumb({ fen }: { fen: string }) {
+interface HoverState {
+  fen: string
+  lastMove: { from: string; to: string } | null
+  x: number
+  y: number
+}
+
+/** Board thumbnail that follows the cursor (fixed positioning), no labels, and
+ *  highlights the last move's squares. */
+function Thumb({ hover }: { hover: HoverState }) {
+  // Offset a little from the cursor; clamp near the right/bottom edges.
+  const size = 140
+  const left = Math.min(hover.x + 16, window.innerWidth - size - 8)
+  const top = Math.min(hover.y + 16, window.innerHeight - size - 8)
   return (
-    <div className="pointer-events-none absolute z-50 mt-1 w-32 rounded border border-slate-300 bg-white p-0.5 shadow-lg">
-      <ChessBoard fen={fen} orientation="white" />
+    <div
+      className="pointer-events-none fixed z-50 rounded border border-slate-300 bg-white p-0.5 shadow-lg"
+      style={{ left, top, width: size }}
+    >
+      <ChessBoard fen={hover.fen} orientation="white" lastMove={hover.lastMove} hideLabels />
     </div>
   )
 }
 
 function GameView({ tree, index }: { tree: GameTree; index: number }) {
   const [multiline, setMultiline] = useState(false)
-  const [hoverFen, setHoverFen] = useState<string | null>(null)
+  const [hover, setHover] = useState<HoverState | null>(null)
   const tokens = useMemo(() => tokenizeTree(tree, multiline), [tree, multiline])
   const varCount = useMemo(() => countVariations(tree), [tree])
 
@@ -126,8 +160,18 @@ function GameView({ tree, index }: { tree: GameTree; index: number }) {
               {t.kind === 'move' ? (
                 <span
                   className="cursor-help rounded hover:bg-amber-200"
-                  onMouseEnter={() => setHoverFen(t.node.fen)}
-                  onMouseLeave={() => setHoverFen(null)}
+                  onMouseEnter={(e) =>
+                    setHover({
+                      fen: t.node.fen,
+                      lastMove: t.node.from && t.node.to ? { from: t.node.from, to: t.node.to } : null,
+                      x: e.clientX,
+                      y: e.clientY,
+                    })
+                  }
+                  onMouseMove={(e) =>
+                    setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
+                  }
+                  onMouseLeave={() => setHover(null)}
                 >
                   {t.text}
                 </span>
@@ -139,7 +183,7 @@ function GameView({ tree, index }: { tree: GameTree; index: number }) {
         })}
       </code>
 
-      {hoverFen && <Thumb fen={hoverFen} />}
+      {hover && <Thumb hover={hover} />}
 
       {/* Errors, highlighted */}
       {tree.errors.length > 0 && (
