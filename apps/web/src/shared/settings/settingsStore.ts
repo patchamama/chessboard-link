@@ -130,6 +130,8 @@ export interface AppSettings {
   playMoveSound: boolean
   /** Delay in seconds between autoplayed moves. */
   autoplayDelay: number
+  /** Move-recognition algorithm: 1 = mainline only, 2 = two-pass, 3 = legacy. */
+  recognitionAlgorithm: 1 | 2 | 3
   /** Board color theme used when regenerating book diagram images. */
   diagramBoardTheme: BoardTheme
   /** Piece set used when regenerating book diagram images. */
@@ -170,6 +172,7 @@ const DEFAULT: AppSettings = {
   fullSquareHighlight: true,
   playMoveSound: true,
   autoplayDelay: 1,
+  recognitionAlgorithm: 2,
   diagramBoardTheme: 'classic',
   diagramPieceTheme: 'merida',
   diagramCoordinates: false,

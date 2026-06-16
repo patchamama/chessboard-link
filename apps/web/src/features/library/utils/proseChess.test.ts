@@ -10,7 +10,9 @@ const ANDERSSEN =
   '19. ♗e4 era más fuerte. 19... ♖g4 fuerte. con 20... ♔d8. sería 21. ♖xd7+ ♔c8 22. ♖d8+ ♔xd8 ' +
   '(22... ♘xd8 23. ♕d7+!); 23. ♗f5+ (23. ♗e2+ ♘d4!) ♕xd1+ 24. ♕xd1+ ♘d4 25. ♗h3 ♗d5.'
 
-const tree = () => recognizeGames(ANDERSSEN)[0].tree
+// These fixtures use single-line post-result analysis (no paragraph structure),
+// which is the legacy single-pass algorithm's domain.
+const tree = () => recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
 
 function nodeBySan(t: ReturnType<typeof tree>, san: string) {
   return [...t.nodes.values()].find((n) => n.san === san && !n.invalid)!

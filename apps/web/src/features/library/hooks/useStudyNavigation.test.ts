@@ -4,8 +4,9 @@ import { recognizeGames } from '@chess-ebook/chess-shared'
 import { useStudyNavigation } from './useStudyNavigation'
 import { useStudyBoardStore } from '../store/studyBoardStore'
 
+// Legacy single-line fixtures (paren variations without paragraph structure).
 const tree = () =>
-  recognizeGames('1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5) a6 4. Ba4')[0].tree
+  recognizeGames('1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5) a6 4. Ba4', { algorithm: 3 })[0].tree
 
 beforeEach(() => useStudyBoardStore.getState().reset())
 
@@ -73,6 +74,7 @@ describe('useStudyNavigation', () => {
         '19. ♖ad1!! ♕xf3 20. ♖xe7+ ♘xe7 21. ♕xd7+! ♔xd7 22. ♗f5+ ♔e8 23. ♗d7+ ♔f8 24. ♗xe7# mate 1-0 ' +
         '19... ♖g4 fuerte. con 20... ♔d8. el mejor juego sería 21. ♖xd7+ ♔c8 22. ♖d8+ ♔xd8 ' +
         '(22... ♘xd8 23. ♕d7+! lleva a mate); 23. ♗f5+ (23. ♗e2+ ♘d4!) ♕xd1+ 24. ♕xd1+ ♘d4 25. ♗h3 ♗d5 incierto.',
+      { algorithm: 3 },
     )[0].tree
     // Sit on Rd8+ (inside the analysis variation line); successor Kxd8 has the Nxd8 alt.
     const rd8 = [...t.nodes.values()].find((n) => n.san === 'Rd8+' && !n.invalid)!

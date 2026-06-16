@@ -26,12 +26,12 @@ function allVariationSans(tree: GameTree) {
 
 describe('prose analysis variations (validation-anchored)', () => {
   it('keeps post-result analysis in the SAME game', () => {
-    const games = recognizeGames(ANDERSSEN)
+    const games = recognizeGames(ANDERSSEN, { algorithm: 3 })
     expect(games).toHaveLength(1)
   })
 
   it('recognises the full 47-move mainline', () => {
-    const tree = recognizeGames(ANDERSSEN)[0].tree
+    const tree = recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
     const sans = mainlineNodes(tree).map((n) => n.san)
     expect(sans).toHaveLength(47)
     expect(sans[0]).toBe('e4')
@@ -40,7 +40,7 @@ describe('prose analysis variations (validation-anchored)', () => {
   })
 
   it('marks NO intended variation move as invalid', () => {
-    const tree = recognizeGames(ANDERSSEN)[0].tree
+    const tree = recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
     // Every node placed in mainline or a variation line must be legal.
     const placed = new Set<string>([
       ...tree.mainline,
@@ -52,7 +52,7 @@ describe('prose analysis variations (validation-anchored)', () => {
   })
 
   it('attaches single-move alternatives Be4, Rg4, Kd8 as variations', () => {
-    const tree = recognizeGames(ANDERSSEN)[0].tree
+    const tree = recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
     const vs = allVariationSans(tree)
     expect(vs).toContain('Be4') // alt to 19. Rad1
     expect(vs).toContain('Rg4') // alt to 19... Qxf3
@@ -60,7 +60,7 @@ describe('prose analysis variations (validation-anchored)', () => {
   })
 
   it('builds the long analysis line as a continuous variation', () => {
-    const tree = recognizeGames(ANDERSSEN)[0].tree
+    const tree = recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
     // The long line: Kd8 Rxd7+ Kc8 Rd8+ Kxd8 Bf5+ Qxd1+ Qxd1+ Nd4 Bh3 Bd5
     const lines = [...tree.variations.values()].flat()
     const longLine = lines.find((l) => sansOf(tree, l).includes('Rd8+'))
@@ -72,7 +72,7 @@ describe('prose analysis variations (validation-anchored)', () => {
   })
 
   it('builds nested parenthesised sub-variations', () => {
-    const tree = recognizeGames(ANDERSSEN)[0].tree
+    const tree = recognizeGames(ANDERSSEN, { algorithm: 3 })[0].tree
     const vs = allVariationSans(tree)
     expect(vs).toContain('Nxd8') // (22... Nxd8 23. Qd7+)
     expect(vs).toContain('Qd7+')

@@ -5,6 +5,7 @@ import React from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import BookReader from './BookReader'
 import { useStudyBoardStore } from '../store/studyBoardStore'
+import { useSettingsStore } from '../../../shared/settings/settingsStore'
 
 const ANALYSIS_HTML =
   '<p>1. e4 e5 2. ♘f3 ♘c6 3. ♗c4 ♗c5 4. b4 ♗xb4 5. c3 ♗a5 6. d4 exd4 7. O-O d3 ' +
@@ -47,7 +48,11 @@ const queryNodeId = (container: HTMLElement, nodeId: string) =>
   container.querySelector(`span[data-node-id="${nodeId}"]`)
 
 describe('BookReader variation underline + chooser', () => {
-  beforeEach(() => useStudyBoardStore.getState().reset())
+  beforeEach(() => {
+    useStudyBoardStore.getState().reset()
+    // This fixture is single-line post-result analysis → legacy algorithm.
+    useSettingsStore.getState().set({ recognitionAlgorithm: 3 })
+  })
 
   it('underlines a move that has alternatives ahead (Rd8+)', async () => {
     const { container } = render(<BookReader />, { wrapper })

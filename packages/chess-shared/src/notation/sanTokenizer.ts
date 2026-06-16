@@ -223,7 +223,8 @@ export function tokenize(text: string): SanToken[] {
       // a new paragraph, not glued to the previous token).
       paragraphBreakEnd = token.charEnd;
       chainEnd = null;
-      // Not emitted into the token stream — it is a positional signal only.
+      // Emit the break so consumers (two-pass builder) can see paragraph bounds.
+      tokens.push(token);
       continue;
     }
     if (token.type === 'move-number') {

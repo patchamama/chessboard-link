@@ -236,10 +236,37 @@ export function buildGameTree(
       continue;
     }
 
-    if (ctx.dead) continue;
-
     const san = token.san!;
     const inParen = ctx.variationStack.length > 0;
+
+    // A dead branch normally swallows the rest of its line. BUT a paragraph-
+    // leading move that is the contiguous next ply of the mainline tip resumes
+    // the mainline — it must NOT be discarded by a dead variation before it.
+    if (ctx.dead) {
+      const tip = lastMainlineNode(tree);
+      const exp = tip
+        ? expectedNext(tip.moveNumber, tip.color)
+        : { moveNumber: 1, color: 'white' as const };
+      const tipFen = tip ? tip.fen : tree.startFen;
+      const canResume =
+        !inParen &&
+        token.atParagraphStart &&
+        token.moveNumber === exp.moveNumber &&
+        token.color === exp.color &&
+        isLegalFrom(tipFen, san);
+      if (canResume) {
+        ctx.dead = false;
+        ctx.onMainline = true;
+        ctx.proseLine = null;
+        ctx.variationStack = [];
+        ctx.chess.load(tipFen);
+        ctx.currentNodeId = tip ? tip.id : null;
+        ctx.fenBeforeLastMove = tipFen;
+        ctx.parentBeforeLastMove = tip ? tip.parentId : null;
+      } else {
+        continue;
+      }
+    }
 
     // ── Embedded move superseded by a later paragraph-leading restatement ──
     // "podían jugar 3...Nf6 …" mid-prose, then "3...a6" leading a new paragraph:
@@ -268,20 +295,22 @@ export function buildGameTree(
       }
     }
 
-    // ── Paragraph-leading move resumes the mainline (signal + validation) ──
-    // The user's key rule: mainline moves almost always start a paragraph. If we
-    // drifted into prose-analysis mode but now see a move that (a) begins a new
-    // paragraph, (b) advances the move number past the mainline tip, and (c) is
-    // legal as the continuation of the mainline tip, then it RESUMES the
-    // mainline — it is not part of the preceding embedded variation.
+    // ── Paragraph-leading move resumes the mainline (number is authoritative) ──
+    // The user's key rule: mainline moves almost always start a paragraph, and
+    // the WRITTEN NUMBER is law. If a paragraph-leading move's (number,color) is
+    // the immediate successor of the mainline tip (the contiguous next ply) and
+    // it is legal there, it RESUMES the mainline — regardless of any variation
+    // (prose or parenthesised) that came in between.
     if (!inParen && !ctx.onMainline && token.atParagraphStart) {
       const tip = lastMainlineNode(tree);
       const tipFen = tip ? tip.fen : tree.startFen;
-      const advances =
-        (token.moveNumber ?? 0) >= ctx.maxMainlineMoveNumber;
-      if (advances && isLegalFrom(tipFen, san)) {
+      const exp = tip ? expectedNext(tip.moveNumber, tip.color) : { moveNumber: 1, color: 'white' as const };
+      const isContiguousNext =
+        token.moveNumber === exp.moveNumber && token.color === exp.color;
+      if (isContiguousNext && isLegalFrom(tipFen, san)) {
         ctx.onMainline = true;
         ctx.proseLine = null;
+        ctx.variationStack = [];
         ctx.chess.load(tipFen);
         ctx.currentNodeId = tip ? tip.id : null;
         ctx.fenBeforeLastMove = tipFen;
@@ -471,10 +500,17 @@ export function buildGameTree(
 }
 
 /**
- * Find where a prose analysis move should anchor. The natural candidate is the
- * PARENT of the mainline move sharing the same (number, color) — the author
- * writes "19. Be4" to replace mainline move 19. chess.js validates the candidate;
- * if it fails, scan mainline parents for the first legal anchor.
+ * Find where a prose analysis move should anchor. THE NUMBER IS AUTHORITATIVE:
+ * a move written "N. san" replaces the mainline ply N, so it anchors at the
+ * PARENT of the position that ply occupies. We locate that position by number,
+ * not by scanning for "first legal" — a move keeps its written number.
+ *
+ * Resolution order (all validated with chess.js):
+ *  1. Parent of the mainline move with the SAME (number,color) — direct replace.
+ *  2. The mainline node whose (number,color) is the PREDECESSOR of the token's
+ *     (i.e. the token continues right after ply N-1) → anchor AT that node.
+ *  3. Fallback only if the number resolves nowhere: parent of the first mainline
+ *     node from whose position the move is legal (legacy behaviour).
  */
 function findProseAnchor(
   ctx: BuildContext,
@@ -489,18 +525,34 @@ function findProseAnchor(
     const parentFen = parentId ? tree.nodes.get(parentId)!.fen : tree.startFen;
     return { parentId, parentFen };
   };
+  const atNode = (nodeId: string): { parentId: string | null; parentFen: string } => {
+    const node = tree.nodes.get(nodeId)!;
+    return { parentId: nodeId, parentFen: node.fen };
+  };
 
-  // 1. Direct key match: parent of the mainline move with this (number, color).
   if (token.moveNumber !== undefined && token.color) {
+    // 1. Same-number replacement: anchor at the PARENT of mainline ply N.
     const keyed = ctx.mainlineByKey.get(moveKey(token.moveNumber, token.color));
     if (keyed) {
       const cand = parentFenOf(keyed);
       if (isLegalFrom(cand.parentFen, san)) return cand;
     }
+
+    // 2. Continuation after ply N-1: anchor AT the predecessor mainline node.
+    const predPly = plyIndex(token.moveNumber, token.color) - 1;
+    if (predPly >= 1) {
+      for (const nodeId of tree.mainline) {
+        const n = tree.nodes.get(nodeId)!;
+        if (plyIndex(n.moveNumber, n.color) === predPly) {
+          const cand = atNode(nodeId);
+          if (isLegalFrom(cand.parentFen, san)) return cand;
+          break;
+        }
+      }
+    }
   }
 
-  // 2. Fallback: scan all mainline nodes; anchor at the parent of the first
-  //    mainline node from whose preceding position the move is legal.
+  // 3. Fallback: first mainline position where the move is legal.
   for (const nodeId of tree.mainline) {
     const cand = parentFenOf(nodeId);
     if (isLegalFrom(cand.parentFen, san)) return cand;

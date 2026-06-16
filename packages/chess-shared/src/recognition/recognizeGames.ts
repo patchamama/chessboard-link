@@ -13,9 +13,23 @@ import { tokenize, type SanToken } from '../notation/sanTokenizer.js';
 import { figurineToAscii } from '../notation/figurineToAscii.js';
 import { spanishToEnglish } from '../notation/spanishToEnglish.js';
 import { buildGameTree } from '../pgn/pgnToTree.js';
+import { buildGameTreeTwoPass } from '../pgn/twoPassBuilder.js';
 import { type GameTree } from '../model/gameTree.js';
 
 const STANDARD_START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+/**
+ * Recognition algorithm:
+ *  - 1: mainline only — pass 1 of the two-pass builder. Builds just the clean
+ *       main line (paragraphs starting with the contiguous next ply), no
+ *       variations at all.
+ *  - 2: two-pass, number-authoritative — mainline first, then variations
+ *       anchored by move number. Keeps the mainline pristine. (Default.)
+ *  - 3: legacy single-pass (validation-anchored). Kept for comparison.
+ */
+export interface RecognizeOptions {
+  algorithm?: 1 | 2 | 3;
+}
 
 export interface RecognizedGame {
   /** Character offset in the original text where the game starts */
@@ -28,7 +42,8 @@ export interface RecognizedGame {
   tree: GameTree;
 }
 
-export function recognizeGames(text: string): RecognizedGame[] {
+export function recognizeGames(text: string, options: RecognizeOptions = {}): RecognizedGame[] {
+  const algorithm = options.algorithm ?? 2;
   // Normalise figurine glyphs (♘→N) and then Spanish notation (Cf3→Nf3).
   // Both transforms are length-preserving for piece letters, so token offsets
   // stay aligned with the ORIGINAL `text` and we can recover the source token.
@@ -93,7 +108,10 @@ export function recognizeGames(text: string): RecognizedGame[] {
     const charStart = seq[0].charStart;
     const charEnd = seq[seq.length - 1].charEnd;
 
-    const tree = buildGameTree(seq, STANDARD_START_FEN);
+    const tree =
+      algorithm === 1 ? buildGameTreeTwoPass(seq, STANDARD_START_FEN, true) // mainline only
+      : algorithm === 2 ? buildGameTreeTwoPass(seq, STANDARD_START_FEN)
+      : buildGameTree(seq, STANDARD_START_FEN);
 
     if (tree.nodes.size === 0) continue;
 

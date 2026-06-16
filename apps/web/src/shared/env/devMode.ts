@@ -11,3 +11,10 @@ export function isDemoHost(): boolean {
   const h = window.location.hostname
   return h.endsWith('.github.io') || h === 'demo.chessreader.app'
 }
+
+/** True in a developer context: Vite dev build or running on localhost.
+ *  Used to surface dev-only tooling (e.g. the recognition debug panel) even when
+ *  the logged-in user is not an admin. */
+export function isDevMode(): boolean {
+  return import.meta.env.DEV || isLocalhostHost()
+}

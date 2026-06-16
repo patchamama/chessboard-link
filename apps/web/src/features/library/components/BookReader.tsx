@@ -17,6 +17,8 @@ import { isMoveLine } from '../utils/isMoveLine'
 import { BookConfigEditor } from './BookConfigEditor'
 import { useAuthStore } from '../../auth/store/authStore'
 import { RecognitionErrorPanel, type FlatError } from './RecognitionErrorPanel'
+import { RecognitionDebugPanel } from './RecognitionDebugPanel'
+import { isDevMode } from '../../../shared/env/devMode'
 import { createRoot, type Root } from 'react-dom/client'
 import { DiagramImage } from './DiagramImage'
 import { inferDiagramFen } from '../utils/inferDiagramFen'
@@ -155,6 +157,9 @@ export default function BookReader() {
   const fontSize = useSettingsStore((s) => s.fontSize)
   const { config: bookConfig } = useBookConfig(id)
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin')
+  // The recognition debug tooling shows for admins OR in any developer context
+  // (Vite dev build / localhost), so you can use it without an admin login.
+  const showDebugTools = isAdmin || isDevMode()
   const [showBookConfig, setShowBookConfig] = useState(false)
 
   const { data, isLoading } = useChapter(id, currentChapter)
@@ -254,7 +259,11 @@ export default function BookReader() {
         .trim(),
     [rawHtml]
   )
-  const games = useMemo(() => recognizeGames(plainText), [plainText])
+  const recognitionAlgorithm = useSettingsStore((s) => s.recognitionAlgorithm)
+  const games = useMemo(
+    () => recognizeGames(plainText, { algorithm: recognitionAlgorithm }),
+    [plainText, recognitionAlgorithm],
+  )
 
   // Flatten every game's recognition errors for the error panel.
   const recognitionErrors = useMemo<FlatError[]>(
@@ -765,6 +774,7 @@ export default function BookReader() {
           }`}
         >
           {showStudy && <StudyBoard />}
+          {showStudy && showDebugTools && <RecognitionDebugPanel chapterText={plainText} />}
         </aside>
       </div>
 
