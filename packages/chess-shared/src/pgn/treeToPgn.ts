@@ -7,6 +7,11 @@
 
 import { type GameTree, type GameNode } from '../model/gameTree.js';
 
+export interface TreeToPgnOptions {
+  /** Put each variation on its own line, indented 3 spaces per nesting depth. */
+  multiline?: boolean;
+}
+
 /** Format one ply's number prefix: "5." for white, "5..." for black. */
 function numberPrefix(node: GameNode, forceBlackDots: boolean): string {
   if (node.color === 'white') return `${node.moveNumber}. `;
@@ -15,16 +20,24 @@ function numberPrefix(node: GameNode, forceBlackDots: boolean): string {
   return forceBlackDots ? `${node.moveNumber}... ` : '';
 }
 
-export function treeToPgn(tree: GameTree): string {
-  const out: string[] = [];
+/** Count the non-empty variation lines in a tree (for the debug panel). */
+export function countVariations(tree: GameTree): number {
+  let n = 0;
+  for (const lines of tree.variations.values()) {
+    for (const line of lines) if (line.length > 0) n++;
+  }
+  return n;
+}
+
+export function treeToPgn(tree: GameTree, options: TreeToPgnOptions = {}): string {
+  const multiline = options.multiline ?? false;
+  const tokens: string[] = [];
   // Guard against cycles / double emission: each variation line is emitted once.
   const emitted = new Set<string[]>();
 
-  // Emit one line of node ids. After each move, print the variation lines that
-  // branch from THAT node (its parent-keyed alternatives are handled by the move
-  // they replace — see below). `anchorBefore` is the key whose lines are the
-  // alternatives to the FIRST move of this line.
-  const emitLine = (ids: string[], startsLine: boolean, anchorBefore: string | null) => {
+  const indent = (depth: number) => '   '.repeat(depth); // 3 spaces per depth
+
+  const emitLine = (ids: string[], startsLine: boolean, depth: number) => {
     if (emitted.has(ids)) return;
     emitted.add(ids);
 
@@ -33,39 +46,50 @@ export function treeToPgn(tree: GameTree): string {
       const node = tree.nodes.get(id);
       if (!node) return;
       const forceDots = node.color === 'black' && (needNumber || i === 0);
-      out.push(numberPrefix(node, forceDots) + (node.rawSan ?? node.san));
+      tokens.push(numberPrefix(node, forceDots) + (node.rawSan ?? node.san));
       needNumber = false;
 
-      // Variations stored under key K replace the child of K, so alternatives to
-      // THIS move hang off this move's PARENT — print them after this move.
+      // Alternatives to THIS move hang off this move's parent.
       const altKey = node.parentId ?? 'root';
       const altLines = (tree.variations.get(altKey) ?? []).filter(
-        (line) => line !== ids && !emitted.has(line) && line[0] !== id,
+        (line) => line.length > 0 && line !== ids && !emitted.has(line) && line[0] !== id,
       );
-      // Sub-variations keyed by THIS node replace this node's child. If the next
-      // node in THIS line is that child, it will print them as its own altLines,
-      // so only emit them here when this is the last node of the line (no child
-      // present to carry them) — this avoids printing them before the child.
+      // Sub-variations keyed by this node print only when it is the line's last
+      // node (otherwise its child carries them as altLines).
       const isLast = i === ids.length - 1;
       const subLines = isLast
-        ? (tree.variations.get(id) ?? []).filter((line) => line !== ids && !emitted.has(line))
+        ? (tree.variations.get(id) ?? []).filter(
+            (line) => line.length > 0 && line !== ids && !emitted.has(line),
+          )
         : [];
 
       for (const line of [...altLines, ...subLines]) {
-        out.push('(');
-        emitLine(line, true, null);
-        out.push(')');
+        if (multiline) {
+          tokens.push('\n' + indent(depth + 1) + '(');
+        } else {
+          tokens.push('(');
+        }
+        emitLine(line, true, depth + 1);
+        tokens.push(')');
         needNumber = true;
       }
     });
   };
 
-  emitLine(tree.mainline, true, null);
+  emitLine(tree.mainline, true, 0);
 
-  return out
-    .join(' ')
-    .replace(/\(\s+/g, '(')
-    .replace(/\s+\)/g, ')')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Join with single spaces, but never put a space right after a "(" or before
+  // a ")", and preserve our explicit "\n<indent>(" line breaks verbatim.
+  let result = '';
+  for (const tok of tokens) {
+    if (tok === ')') {
+      result = result.replace(/\s+$/, '') + ')';
+    } else if (tok === '(' || tok.startsWith('\n')) {
+      result += (result && !result.endsWith('\n') && !tok.startsWith('\n') ? ' ' : '') + tok;
+    } else {
+      result += (result && !result.endsWith('(') && !result.endsWith('\n') ? ' ' : '') + tok;
+    }
+  }
+  void multiline;
+  return result.trim();
 }

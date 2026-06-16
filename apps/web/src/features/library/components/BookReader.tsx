@@ -265,6 +265,15 @@ export default function BookReader() {
     [plainText, recognitionAlgorithm],
   )
 
+  // When the algorithm changes the recognised trees are rebuilt, so any game
+  // open in the study board points at a stale tree. Close it so the viewer and
+  // the debug panel always reflect the SAME algorithm.
+  const clearStudyGame = useStudyBoardStore((s) => s.clearGame)
+  useEffect(() => {
+    clearStudyGame()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recognitionAlgorithm])
+
   // Flatten every game's recognition errors for the error panel.
   const recognitionErrors = useMemo<FlatError[]>(
     () =>
