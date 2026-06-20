@@ -52,6 +52,7 @@ export class DgtAdapter extends BaseBoardAdapter {
   }
 
   private handleData(chunk: Uint8Array): void {
+    this.reportIo('received', chunk);
     try {
       for (const message of this.reader.push(chunk)) {
         if (message.id === DgtMessage.BOARD_DUMP) {

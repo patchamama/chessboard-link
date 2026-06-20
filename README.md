@@ -12,12 +12,25 @@ extension and open-source projects.
   [README](./packages/chess-board-link/README.md) for usage and
   [PROTOCOLS.md](./packages/chess-board-link/PROTOCOLS.md) for the wire formats
   of all 15 boards in the extension.
-- **`apps/web-test`** — a React 19 + Vite **play app**: interactive board
-  (moves validated by chess.js), play vs a **Stockfish** bot (loaded from CDN),
-  live **eval bar** + FEN, several boards at once (tabs), session **persistence**
-  across refreshes, one-click Bluetooth **reconnect**, and physical-board
-  controls (light a move on the board, sync, etc.). A hardware-free **Mock**
-  board lets you try it all without hardware.
+- **`apps/web-test`** — a React 19 + Vite **play app**. Features:
+  - Interactive board; moves validated by **chess.js**.
+  - Play vs a **Stockfish** bot (CDN) with adjustable skill.
+  - **Progressive analysis** (depth 1→30) with a live **eval bar** + FEN, and a
+    **candidate-moves** panel (MultiPV ~10): each line shows its eval and SAN,
+    hovering previews it on a mini-board and highlights it on the main board,
+    and the top move is clickable to play it.
+  - **PGN move list** with piece glyphs; **colour-coded event log** (your moves,
+    bot, data received from / sent to the board).
+  - Choose **piece set** and **board colour theme**; **light/dark** mode.
+  - Several boards at once (**tabs**), each with its own session; **persistence**
+    across refreshes; one-click Bluetooth **reconnect**; physical-board controls
+    (light a move, sync, etc.). A hardware-free **Mock** board needs no hardware.
+
+## Tech stack
+
+React 19 · TypeScript · Vite · Zustand-free local hooks · chess.js · Stockfish
+(WASM/asm.js via CDN) · Web Bluetooth / Web Serial · Vitest · pnpm workspaces ·
+GitHub Actions + GitHub Pages.
 
 ## Getting started
 

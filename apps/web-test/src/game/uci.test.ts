@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { evalToWhiteProbability, parseBestMove, parseInfoLine } from './uci.js';
 
 describe('UCI parsing', () => {
-  it('parses a centipawn score with depth', () => {
-    const e = parseInfoLine('info depth 18 seldepth 24 score cp 35 nodes 1000 pv e2e4');
-    expect(e).toEqual({ depth: 18, cp: 35 });
+  it('parses a centipawn score with depth and pv', () => {
+    const e = parseInfoLine('info depth 18 seldepth 24 score cp 35 nodes 1000 pv e2e4 e7e5');
+    expect(e).toEqual({ depth: 18, cp: 35, pv: ['e2e4', 'e7e5'] });
   });
 
   it('parses a mate score', () => {
     const e = parseInfoLine('info depth 20 score mate -3 pv a1a2');
-    expect(e).toEqual({ depth: 20, mate: -3 });
+    expect(e).toEqual({ depth: 20, mate: -3, pv: ['a1a2'] });
+  });
+
+  it('parses a MultiPV rank', () => {
+    const e = parseInfoLine('info depth 15 multipv 3 score cp -12 pv d2d4 d7d5');
+    expect(e?.multipv).toBe(3);
+    expect(e?.pv).toEqual(['d2d4', 'd7d5']);
   });
 
   it('returns null for an info line without a score', () => {

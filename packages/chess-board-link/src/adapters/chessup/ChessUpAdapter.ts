@@ -89,11 +89,13 @@ export class ChessUpAdapter extends BaseBoardAdapter {
 
   private handleData(view: DataView): void {
     const data = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+    this.reportIo('received', data);
     try {
       switch (data[0]) {
         case ChessUpOpcode.MOVE:
           this.handleMove(parseChessUpMove(data));
           // Acknowledge receipt, mirroring the extension.
+          this.reportIo('sent', CHESSUP_ACK);
           void this.transport.write(CHESSUP_ACK).catch(() => {});
           break;
         case ChessUpOpcode.ERROR:

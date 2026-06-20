@@ -5,19 +5,28 @@ export interface UciEval {
   /** Mate in N (positive = side-to-move mates, negative = gets mated). */
   mate?: number;
   depth?: number;
+  /** MultiPV rank (1 = best line), when MultiPV is enabled. */
+  multipv?: number;
+  /** Principal variation (UCI moves), first is the candidate move. */
+  pv?: string[];
 }
 
-/** Parse an engine `info ... score cp/mate ...` line. Returns null if no score. */
+/** Parse an engine `info ... score cp/mate ... [multipv N] [pv ...]` line. */
 export function parseInfoLine(line: string): UciEval | null {
   if (!line.startsWith('info')) return null;
   const out: UciEval = {};
   const depth = /\bdepth (\d+)/.exec(line);
   if (depth) out.depth = Number(depth[1]);
+  const multipv = /\bmultipv (\d+)/.exec(line);
+  if (multipv) out.multipv = Number(multipv[1]);
   const cp = /\bscore cp (-?\d+)/.exec(line);
   const mate = /\bscore mate (-?\d+)/.exec(line);
   if (cp) out.cp = Number(cp[1]);
   else if (mate) out.mate = Number(mate[1]);
   else return null;
+  // The pv (move list) is everything after " pv " to end of line.
+  const pv = / pv (.+)$/.exec(line);
+  if (pv && pv[1]) out.pv = pv[1].trim().split(/\s+/);
   return out;
 }
 

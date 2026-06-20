@@ -7,19 +7,24 @@ import {
   type ConnectionStatus,
   type DetectedMove,
 } from 'chess-board-link';
-import { ChessBoard } from './components/ChessBoard.js';
+import { ChessBoard, PIECE_SET_OPTIONS } from './components/ChessBoard.js';
 import { EvalBar } from './components/EvalBar.js';
 import { FenPanel } from './components/FenPanel.js';
 import { BoardTabs } from './components/BoardTabs.js';
 import { PhysicalControls } from './components/PhysicalControls.js';
-import { EventLog, type LogEntry } from './components/EventLog.js';
+import { EventLog, type LogEntry, type LogKind } from './components/EventLog.js';
+import { MovesPanel } from './components/MovesPanel.js';
+import { AnalysisPanel } from './components/AnalysisPanel.js';
 import { useChessGame } from './game/useChessGame.js';
 import { useStockfish } from './game/useStockfish.js';
+import { buildCandidates } from './game/candidates.js';
 import { useBoardSessions } from './boards/useBoardSessions.js';
 import { START_FEN } from './boards/boardStorage.js';
 import { useTheme } from './useTheme.js';
 import { PlayIcon, PauseIcon, SunIcon, MoonIcon } from './components/Icons.js';
 import { APP_VERSION } from './version.js';
+
+const BOARD_THEMES = ['brown', 'blue', 'green', 'grey'] as const;
 
 export function App() {
   const sessionsApi = useBoardSessions();
@@ -33,10 +38,11 @@ export function App() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [knownDevices, setKnownDevices] = useState<string[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [hoverHl, setHoverHl] = useState<{ from: string; to: string } | null>(null);
   const adapterRef = useRef<BoardAdapter | null>(null);
 
-  const append = useCallback((text: string) => {
-    setLog((l) => [{ ts: new Date().toLocaleTimeString(), text }, ...l].slice(0, 100));
+  const append = useCallback((text: string, kind: LogKind = 'info') => {
+    setLog((l) => [{ ts: new Date().toLocaleTimeString(), text, kind }, ...l].slice(0, 120));
   }, []);
 
   // Make sure the active board has a session.
@@ -61,7 +67,7 @@ export function App() {
 
   // Analyse the current position whenever it changes and the engine is ready.
   useEffect(() => {
-    if (sf.ready) sf.analyse(game.fen, 30); // progressive: streams depth 1→30
+    if (sf.ready) sf.analyse(game.fen, { maxDepth: 30, multipv: 10 }); // progressive + candidates
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.fen, sf.ready]);
 
@@ -82,7 +88,7 @@ export function App() {
       if (!cancelled && uci) {
         const m = game.move(uci);
         if (m) {
-          append(`bot: ${m.san}`);
+          append(`bot: ${m.san}`, 'bot');
           void highlightOnPhysical(uci);
         }
       }
@@ -96,7 +102,7 @@ export function App() {
   function wireAdapter(adapter: BoardAdapter) {
     adapter.on('status', (s) => {
       setStatus(s);
-      append(`[${adapter.id}] status: ${s}`);
+      append(`[${adapter.id}] status: ${s}`, 'status');
       if (s === 'connected' && adapter.deviceId) {
         updateSession(adapter.id, { deviceId: adapter.deviceId, deviceName: adapter.deviceName });
       }
@@ -104,9 +110,18 @@ export function App() {
     adapter.on('move', (m: DetectedMove) => {
       // A move made on the physical board — apply it to the game if legal.
       const applied = game.move(m.uci);
-      append(`[${adapter.id}] board move: ${m.uci}${applied ? ` (${applied.san})` : ' (ignored)'}`);
+      append(
+        `board move: ${m.uci}${applied ? ` (${applied.san})` : ' (ignored — illegal here)'}`,
+        'received',
+      );
     });
-    adapter.on('error', (e) => append(`[${adapter.id}] error: ${e.message}`));
+    adapter.on('io', ({ direction, bytes }) => {
+      const hex = Array.from(bytes.slice(0, 16))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' ');
+      append(`${direction === 'sent' ? '→ board' : '← board'}: ${hex}`, direction);
+    });
+    adapter.on('error', (e) => append(`[${adapter.id}] ${e.message}`, 'error'));
   }
 
   async function connect(useKnownDevice: boolean) {
@@ -117,7 +132,7 @@ export function App() {
       const deviceId = useKnownDevice ? active?.deviceId : undefined;
       await adapter.connect(deviceId ? { deviceId } : undefined);
     } catch (e) {
-      append(`connect failed: ${(e as Error).message}`);
+      append(`connect failed: ${(e as Error).message}`, 'error');
     }
   }
 
@@ -137,13 +152,17 @@ export function App() {
   function onUserMove(uci: string) {
     const m = game.move(uci);
     if (!m) return;
-    append(`you: ${m.san}`);
+    append(`you: ${m.san}`, 'you');
     void highlightOnPhysical(uci);
   }
 
   const reg = registry.get(activeId);
   const supportsLeds = !!adapterRef.current?.setLeds;
   const cfg = active?.config;
+  const pieceSet = cfg?.pieceSet ?? 'cburnett';
+  const boardTheme = cfg?.boardTheme ?? 'brown';
+  // Build clickable candidate moves from the engine's MultiPV lines.
+  const candidates = buildCandidates(game.fen, sf.lines);
 
   return (
     <div className="app">
@@ -239,19 +258,57 @@ export function App() {
           New game
         </button>
         <button type="button" onClick={() => game.undo()}>Undo</button>
+        <label>
+          Pieces&nbsp;
+          <select
+            value={pieceSet}
+            onChange={(e) => updateConfig(activeId, { pieceSet: e.target.value })}
+          >
+            {PIECE_SET_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Board&nbsp;
+          <select
+            value={boardTheme}
+            onChange={(e) => updateConfig(activeId, { boardTheme: e.target.value })}
+          >
+            {BOARD_THEMES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <div className="layout">
         <EvalBar evaluation={sf.evaluation} sideToMove={game.turn} />
-        <ChessBoard
-          fen={game.fen}
-          legalTargets={game.legalTargets}
-          onMove={onUserMove}
-          lastMove={game.lastMove}
-          flipped={cfg?.flipped}
-        />
+        <div className="board-col">
+          <ChessBoard
+            fen={game.fen}
+            legalTargets={game.legalTargets}
+            onMove={onUserMove}
+            lastMove={game.lastMove}
+            highlight={hoverHl}
+            flipped={cfg?.flipped}
+            pieceSet={pieceSet}
+            boardTheme={boardTheme}
+          />
+          <AnalysisPanel
+            depth={sf.evaluation?.depth}
+            candidates={candidates}
+            sideToMove={game.turn}
+            pieceSet={pieceSet}
+            onPlay={(uci) => onUserMove(uci)}
+            onHover={(uci) =>
+              setHoverHl(uci ? { from: uci.slice(0, 2), to: uci.slice(2, 4) } : null)
+            }
+          />
+        </div>
         <div className="side">
           <FenPanel fen={game.fen} turn={game.turn} result={game.result} evaluation={sf.evaluation} />
+          <MovesPanel history={game.history} />
           <EventLog log={log} />
         </div>
       </div>

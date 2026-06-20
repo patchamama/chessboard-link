@@ -8,6 +8,8 @@ export interface BoardConfig {
   botEnabled: boolean;
   botSkill: number; // 0..20
   botPlaysWhite: boolean;
+  pieceSet: string; // cburnett, merida, alpha, …
+  boardTheme: string; // square colours: brown, blue, green, grey
 }
 
 export interface BoardSession {
@@ -29,6 +31,8 @@ export const DEFAULT_CONFIG: BoardConfig = {
   botEnabled: false,
   botSkill: 5,
   botPlaysWhite: false,
+  pieceSet: 'cburnett',
+  boardTheme: 'brown',
 };
 
 export const START_FEN =

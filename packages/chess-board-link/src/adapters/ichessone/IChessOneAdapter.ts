@@ -65,6 +65,7 @@ export class IChessOneAdapter extends BaseBoardAdapter {
   }
 
   private handleData(view: DataView): void {
+    this.reportIo('received', new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
     try {
       const frame = this.decoder.decode(
         new Uint8Array(view.buffer, view.byteOffset, view.byteLength),

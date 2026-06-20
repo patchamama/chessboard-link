@@ -108,4 +108,9 @@ export abstract class BaseBoardAdapter
   protected reportError(error: Error): void {
     this.emit('error', error);
   }
+
+  /** Emit a raw I/O event (bytes sent to / received from the board). */
+  protected reportIo(direction: 'sent' | 'received', bytes: Uint8Array): void {
+    this.emit('io', { direction, bytes });
+  }
 }

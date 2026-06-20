@@ -16,10 +16,12 @@ const STOCKFISH_CDN =
 
 export interface StockfishApi {
   ready: boolean;
-  /** Latest streamed evaluation for the analysed position. */
+  /** Latest streamed evaluation (best line) for the analysed position. */
   evaluation: UciEval | null;
-  /** Analyse a FEN to a depth (updates `evaluation` as it searches). */
-  analyse: (fen: string, depth?: number) => void;
+  /** Top candidate lines (MultiPV), ranked best-first. */
+  lines: UciEval[];
+  /** Analyse a FEN progressively; `multipv` controls how many lines to return. */
+  analyse: (fen: string, opts?: { maxDepth?: number; multipv?: number }) => void;
   /** Ask for the best move at a skill level; resolves with a UCI move. */
   bestMove: (fen: string, opts?: { skill?: number; movetime?: number }) => Promise<string | null>;
   stop: () => void;
@@ -41,6 +43,8 @@ export function useStockfish(): StockfishApi {
   const workerRef = useRef<Worker | null>(null);
   const [ready, setReady] = useState(false);
   const [evaluation, setEvaluation] = useState<UciEval | null>(null);
+  const [lines, setLines] = useState<UciEval[]>([]);
+  const linesRef = useRef<Record<number, UciEval>>({});
   const bestMoveResolver = useRef<((uci: string | null) => void) | null>(null);
 
   useEffect(() => {
@@ -56,7 +60,17 @@ export function useStockfish(): StockfishApi {
       const line = String(ev.data);
       if (line.includes('uciok') || line.includes('readyok')) setReady(true);
       const info = parseInfoLine(line);
-      if (info) setEvaluation(info);
+      if (info) {
+        const rank = info.multipv ?? 1;
+        linesRef.current[rank] = info;
+        if (rank === 1) setEvaluation(info);
+        // Rebuild the ranked list (1..N) from what we've collected.
+        const ranked = Object.keys(linesRef.current)
+          .map(Number)
+          .sort((a, b) => a - b)
+          .map((r) => linesRef.current[r]!);
+        setLines(ranked);
+      }
       const best = line.startsWith('bestmove') ? parseBestMove(line) : null;
       if (line.startsWith('bestmove') && bestMoveResolver.current) {
         bestMoveResolver.current(best);
@@ -85,8 +99,12 @@ export function useStockfish(): StockfishApi {
    * instead of blanking it, for a smooth refinement.
    */
   const analyse = useCallback(
-    (fen: string, maxDepth = 30) => {
+    (fen: string, opts: { maxDepth?: number; multipv?: number } = {}) => {
+      const maxDepth = opts.maxDepth ?? 30;
+      const multipv = opts.multipv ?? 1;
       send('stop');
+      linesRef.current = {};
+      send(`setoption name MultiPV value ${multipv}`);
       send(`position fen ${fen}`);
       send(`go depth ${maxDepth}`);
     },
@@ -110,5 +128,5 @@ export function useStockfish(): StockfishApi {
 
   const stop = useCallback(() => send('stop'), [send]);
 
-  return { ready, evaluation, analyse, bestMove, stop };
+  return { ready, evaluation, lines, analyse, bestMove, stop };
 }

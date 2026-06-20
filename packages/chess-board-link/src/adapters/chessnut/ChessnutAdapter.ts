@@ -68,6 +68,7 @@ export class ChessnutAdapter extends BaseBoardAdapter {
   }
 
   private handleData(data: DataView): void {
+    this.reportIo('received', new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     try {
       const board = decodeChessnutBoard(data);
       this.pushBoardState(board);

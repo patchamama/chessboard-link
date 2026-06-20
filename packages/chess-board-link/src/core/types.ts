@@ -60,6 +60,12 @@ export interface LedState {
   on: boolean;
 }
 
+/** Raw bytes exchanged with the board, for logging/debugging. */
+export interface IoEvent {
+  direction: 'sent' | 'received';
+  bytes: Uint8Array;
+}
+
 /** Events emitted by a {@link BoardAdapter}. */
 export interface BoardAdapterEvents {
   /** Full board snapshot changed. */
@@ -70,4 +76,6 @@ export interface BoardAdapterEvents {
   status: ConnectionStatus;
   /** Non-fatal error or protocol warning. */
   error: Error;
+  /** Raw bytes sent to / received from the board (for the event log). */
+  io: IoEvent;
 }

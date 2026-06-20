@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { fenToBoard, indexToSquare, squareToIndex } from 'chess-board-link';
 
-// Piece sprites from lichess's CDN (Cburnett set, free/GPL). Filenames are
-// <Color><PieceUpper>.svg, e.g. wP.svg, bN.svg.
-const PIECE_BASE = 'https://lichess1.org/assets/piece/cburnett';
+// Piece sprites from lichess's CDN. Each set has files <Color><PieceUpper>.svg,
+// e.g. wP.svg, bN.svg. All sets are free/GPL.
+const PIECE_SETS = ['cburnett', 'merida', 'alpha', 'pirouetti', 'gioco'] as const;
+export type PieceSet = (typeof PIECE_SETS)[number];
+export const PIECE_SET_OPTIONS = PIECE_SETS;
 
-function pieceSrc(piece: string): string {
+function pieceSrc(piece: string, set: string): string {
   const color = piece === piece.toUpperCase() ? 'w' : 'b';
-  return `${PIECE_BASE}/${color}${piece.toUpperCase()}.svg`;
+  return `https://lichess1.org/assets/piece/${set}/${color}${piece.toUpperCase()}.svg`;
 }
 
 const PIECE_NAMES: Record<string, string> = {
@@ -28,12 +30,27 @@ interface ChessBoardProps {
   onMove: (uci: string) => void;
   /** Highlight the last move's from/to squares. */
   lastMove?: { from: string; to: string };
+  /** Extra highlight (e.g. a hovered engine candidate) from/to squares. */
+  highlight?: { from: string; to: string } | null;
   /** Render from black's perspective. */
   flipped?: boolean;
+  /** Piece sprite set (default cburnett). */
+  pieceSet?: string;
+  /** Board square colour theme (CSS class suffix), default 'brown'. */
+  boardTheme?: string;
 }
 
 /** Interactive 8x8 board: click a piece, then a legal target, to move. */
-export function ChessBoard({ fen, legalTargets, onMove, lastMove, flipped }: ChessBoardProps) {
+export function ChessBoard({
+  fen,
+  legalTargets,
+  onMove,
+  lastMove,
+  highlight,
+  flipped,
+  pieceSet = 'cburnett',
+  boardTheme = 'brown',
+}: ChessBoardProps) {
   const board = fenToBoard(fen);
   const [selected, setSelected] = useState<string | null>(null);
   const targets = selected ? legalTargets(selected) : [];
@@ -59,7 +76,7 @@ export function ChessBoard({ fen, legalTargets, onMove, lastMove, flipped }: Che
   }
 
   return (
-    <div className="board" role="grid" aria-label="chess board">
+    <div className={`board theme-${boardTheme}`} role="grid" aria-label="chess board">
       {order.map((i) => {
         const square = indexToSquare(i);
         const piece = board[i] ?? null;
@@ -67,6 +84,7 @@ export function ChessBoard({ fen, legalTargets, onMove, lastMove, flipped }: Che
         const isSel = selected === square;
         const isTarget = targets.includes(square);
         const isLast = lastMove && (lastMove.from === square || lastMove.to === square);
+        const isHl = highlight && (highlight.from === square || highlight.to === square);
         return (
           <button
             key={i}
@@ -77,12 +95,13 @@ export function ChessBoard({ fen, legalTargets, onMove, lastMove, flipped }: Che
               isSel ? 'selected' : '',
               isTarget ? 'target' : '',
               isLast ? 'lastmove' : '',
+              isHl ? 'candidate-hl' : '',
             ].join(' ')}
             data-square={square}
             onClick={() => clickSquare(square, piece)}
           >
             {piece ? (
-              <img className="piece" src={pieceSrc(piece)} alt={pieceLabel(piece)} draggable={false} />
+              <img className="piece" src={pieceSrc(piece, pieceSet)} alt={pieceLabel(piece)} draggable={false} />
             ) : null}
             {isTarget ? <span className="dot" /> : null}
           </button>
