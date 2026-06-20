@@ -1,0 +1,470 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chessconnect Options</title>
+    <style>
+      body {
+        font-family: 'Arial', sans-serif;
+        line-height: 1.6;
+        background-color: #ece5e2;
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      html {
+        height: 100%;
+        margin: 0;
+      }
+
+      header,
+      footer {
+        flex-shrink: 0;
+        background-color: #d0c2b4;
+        width: 100%;
+        border-radius: 15px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        margin-top: 10px;
+      }
+
+      footer {
+        padding-bottom: 25px;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        overflow-y: auto;
+        background-color: #d0c2b4;
+        width: 100%;
+        border-radius: 15px;
+        margin-top: 15px;
+        margin-bottom: 15px;
+      }
+
+      h1,
+      h2 {
+        font-size: 18px;
+      }
+
+      ul {
+        list-style-type: circle;
+        padding-left: 20px;
+      }
+
+      .version {
+        margin-bottom: 10px;
+      }
+
+      .date {
+        font-style: italic;
+      }
+
+      .tab-btn {
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .tab-content {
+        display: block;
+        padding: 20px;
+        border: 1px solid #ccc;
+      }
+
+      div.licenses {
+        display: flex;
+        flex-direction: column;
+        font-size: small;
+      }
+
+      .flex-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+      }
+
+      .flex-container > div {
+        margin: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 15px;
+        flex-direction: column;
+        display: flex;
+      }
+
+      .flex-container label {
+        margin-bottom: 5px;
+        padding: 5px;
+      }
+
+      .flex-container select,
+      .flex-container input[type='text'],
+      .flex-container input[type='number'],
+      .flex-container input[type='range'],
+      .flex-container input[type='color'],
+      .optionButton {
+        width: calc(100% - 10px);
+        padding: 4px;
+        box-sizing: border-box;
+        margin-bottom: 5px;
+        max-width: 300px;
+        height: 40px;
+        font-size: 14px;
+        border-radius: 15px;
+      }
+
+      #status {
+        margin-top: 10px;
+        border-radius: 5px;
+        background-color: #f0edea;
+      }
+
+      .optionButton {
+        background-color: #ece5e2;
+        color: black;
+        border: none;
+        cursor: pointer;
+        border-radius: 15px;
+        display: block;
+        margin: 20px auto;
+        width: 80%;
+        max-width: 300px; /* Limit the maximum width */
+      }
+
+      .optionButton:disabled {
+        background-color: #ddd;
+      }
+
+      p {
+        margin-bottom: 10px;
+      }
+
+      th {
+        text-align: left;
+      }
+
+      a {
+        color: black;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .align-vertical {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+      }
+
+      /* Removed all custom checkbox styling to allow native rendering */
+
+      .button-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      input[type='color'] {
+        border: none;
+        padding: 0;
+        background: none;
+      }
+
+      @media (max-width: 600px) {
+        .tab-content {
+          padding: 10px;
+        }
+
+        .flex-container > div {
+          margin: 5px;
+          padding: 5px;
+        }
+
+        .optionButton {
+          width: 50%;
+          margin: 10px;
+        }
+
+        .button-container {
+          flex-direction: row;
+          flex-wrap: nowrap;
+          gap: 10%;
+          margin: 10px;
+        }
+
+        table {
+          width: 100%;
+        }
+
+        table input {
+          width: 100%;
+          max-width: none; /* Remove max-width for table inputs */
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header id="header">
+      <div class="align-vertical" style="flex-direction: row; justify-content: space-evenly">
+        <a href="https://play.google.com/store/apps/details?id=de.chessconnect" target="_blank" id="googlePlayLink">
+          <img
+            src="../../res/GetItOnGooglePlay.png"
+            alt="Get it on Google Play"
+            style="height: 25px; cursor: pointer"
+          />
+        </a>
+        <a href="https://apps.apple.com/de/app/chessconnect/id6747821027" target="_blank" id="appStoreLink">
+          <img src="../../res/GetItOnAppStore.svg" alt="Get it on App Store" style="height: 25px; cursor: pointer" />
+        </a>
+        <div style="display: flex; flex-direction: row; align-items: center" id="buyMeATea">
+          <span i18ntag="SupportMe"></span>
+          <a href="https://www.buymeacoffee.com/chessconnect" target="_blank"
+            ><img
+              width="150px"
+              src="https://img.buymeacoffee.com/button-api/?text=Buy me a tea&emoji=☕&slug=chessconnect&button_colour=f8ebd9&font_colour=000000&font_family=Comic&outline_colour=000000&coffee_colour=FFDD00"
+              crossorigin="anonymous"
+          /></a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="tab-content" id="tabOptions">
+        <h2 i18ntag="Options">General options</h2>
+        <div class="flex-container">
+          <div>
+            <label for="boardType" i18ntag="Chessboard"></label>
+            <select id="boardType">
+              <option value="3">Certabo, TabuTronic</option>
+              <option value="11">TabuTronic Spectrum</option>
+              <option value="1">Chessnut</option>
+              <option value="9">ChessUp</option>
+              <option value="5">DGT eBoard</option>
+              <option value="6">DGT Pegasus</option>
+              <option value="10">DGT Revelation II</option>
+              <option value="14">GoChess</option>
+              <option value="4">House of Staunton</option>
+              <option value="7">iChessOne</option>
+              <option value="15">Manya Cynus</option>
+              <option value="2">Millennium</option>
+              <option value="13">Phantom Chessboard</option>
+              <option value="12">SenseRobot</option>
+              <option value="8">Yizhi, 逸智</option>
+            </select>
+
+            <div id="connectionTypeDiv" class="flex-container">
+              <label for="connectionType" i18ntag="ConnectionMethod"></label>
+              <select id="connectionType">
+                <option value="5">Bluetooth</option>
+                <option value="6">USB</option>
+              </select>
+            </div>
+            <div id="appleBleOnlyDiv">
+              <p i18ntag="AppleBLEOnlyWarning">
+                Due to restrictions imposed by Apple, Chessconnect on iOS can only supprt Bluetooth LE. USB and
+                Bluetooth Classic are not available on this platform.
+              </p>
+            </div>
+
+            <label for="onOpponentMove" i18ntag="OnOpponentMove"></label>
+            <select id="onOpponentMove">
+              <option value="1" i18ntag="Beep"></option>
+              <option value="2" i18ntag="KnockWood"></option>
+              <option value="3" i18ntag="AnnounceMove"></option>
+              <option value="0" i18ntag="StayQuiet"></option>
+            </select>
+
+            <label for="voice" i18ntag="Voice" id="voiceLabel"></label>
+            <select id="voice"></select>
+
+            <label class="checkbox-label" for="confirmBoardOk">
+              <input type="checkbox" id="confirmBoardOk" name="confirmBoardOk" />
+              <span i18ntag="confirmBoardOk"></span>
+            </label>
+
+            <label class="checkbox-label" for="readChatMessages">
+              <input type="checkbox" id="readChatMessages" name="readChatMessages" />
+              <span i18ntag="readChatMessages"></span>
+            </label>
+
+            <label for="latency" i18ntag="MoveLatencyInMs"></label>
+            <input type="number" id="latency" />
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tabRfid">
+        <h2 i18ntag="BoardOptions">Board options</h2>
+        <div class="flex-container">
+          <div id="moveOptions">
+            <label class="checkbox-label" for="reversePositionWhenBlack">
+              <input type="checkbox" id="reversePositionWhenBlack" name="reversePositionWhenBlack" />
+              <span i18ntag="reversePositionWhenBlack"></span>
+            </label>
+          </div>
+          <div id="rgbOptions">
+            <label for="ledcolor" i18nTag="colorSquareNotMatching"></label>
+            <input type="color" id="ledcolor" name="ledcolor" />
+
+            <label for="ledcolorStart" i18nTag="colorSquareStart"></label>
+            <input type="color" id="ledcolorStart" name="ledcolorStart" />
+
+            <label for="ledcolorTarget" i18nTag="colorSquareTarget"></label>
+            <input type="color" id="ledcolorTarget" name="ledcolorTarget" />
+
+            <label for="ledcolorCheck" i18nTag="colorCheck"></label>
+            <input type="color" id="ledcolorCheck" name="ledcolorCheck" />
+          </div>
+
+          <div id="brightnessOptions">
+            <label for="ledBrightness" i18nTag="ledBrightness"></label>
+            <input type="range" id="ledBrightness" name="ledBrightness" min="0" max="100" />
+          </div>
+
+          <div id="ledClockOptions">
+            <label class="checkbox-label" for="showLedClock">
+              <input type="checkbox" id="showLedClock" name="showLedClock" />
+              <span i18ntag="showLedClock"></span>
+            </label>
+
+            <label for="ledClockColor" i18nTag="ledClockColor" class="ledClockColor"></label>
+            <input type="color" id="ledClockColor" name="ledClockColor" class="ledClockColor" />
+
+            <label for="ledClockBrightness" i18nTag="ledClockBrightness" class="ledClockBrightness"></label>
+            <input
+              type="range"
+              id="ledClockBrightness"
+              name="ledClockBrightness"
+              class="ledClockBrightness"
+              min="0"
+              max="100"
+            />
+          </div>
+
+          <div id="clockOptions" class="buttonContainer">
+            <label for="chessClockType" i18ntag="ChessClockType"></label>
+            <select id="chessClockType">
+              <option value="0" i18ntag="NoClock"></option>
+              <option value="1">DGT3000</option>
+              <option value="2">DGT3000 BLE Gateway</option>
+              <option value="3">Zmartfun TapNset pro</option>
+              <option value="4">TapNset Chessconnect adapter</option>
+            </select>
+            <label for="chessClockDisplay" i18ntag="ChessClockDisplay"></label>
+            <select id="chessClockDisplay">
+              <option value="1" i18ntag="WhiteLeft"></option>
+              <option value="2" i18ntag="WhiteRight"></option>
+              <option value="3" i18ntag="ClockPlayerLeft"></option>
+              <option value="4" i18ntag="ClockPlayerRight"></option>
+            </select>
+            <label class="checkbox-label" for="pressClockToTransmitMoves" id="pressClockToTransmitMovesLabel">
+              <input type="checkbox" id="pressClockToTransmitMoves" name="pressClockToTransmitMoves" />
+              <span i18ntag="pressClockToTransmitMoves"></span>
+            </label>
+            <label class="checkbox-label" for="showMovesOnClock" id="showMovesOnClockLabel">
+              <input type="checkbox" id="showMovesOnClock" name="showMovesOnClock" />
+              <span i18ntag="showMovesOnClock"></span>
+            </label>
+          </div>
+
+          <div class="button-container" id="rfidOptions">
+            <button class="optionButton" id="learnRfIds" i18ntag="TeachInPieces"></button>
+            <button class="optionButton" id="forgetRfIds" i18ntag="ForgetLearnedChessPieces"></button>
+            <p>
+              <i>
+                <span i18ntag="TeachingOnlyCertabo"></span>
+              </i>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tabLichess">
+        <div class="hiddenInApp">
+          <label class="checkbox-label" for="enableApiToken">
+            <input type="checkbox" id="enableApiToken" name="enableApiToken" />
+            <span i18ntag="enableApiToken"></span>
+          </label>
+        </div>
+
+        <div id="apiTokenDiv">
+          <h2 i18ntag="ApiToken">Lichess options</h2>
+          <div class="flex-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>API token</th>
+                  <th>Username</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="text" i18nplaceholder="Enter_API_token" id="lichessToken1" /></td>
+                  <td><input type="text" id="lichessUsername1" readonly /></td>
+                </tr>
+                <tr>
+                  <td><input type="text" i18nplaceholder="Enter_API_token" id="lichessToken2" /></td>
+                  <td><input type="text" id="lichessUsername2" readonly /></td>
+                </tr>
+                <tr>
+                  <td><input type="text" i18nplaceholder="Enter_API_token" id="lichessToken3" /></td>
+                  <td><input type="text" id="lichessUsername3" readonly /></td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              <b><span i18ntag="TOKEN_INPUT_HINT"></span></b>
+            </p>
+            <p>
+              <i>
+                <span i18ntag="LICHESS_TOKEN_HINT"></span>
+              </i>
+            </p>
+            <p>
+              <i>
+                <span i18ntag="LICHESS_TIME_FORMATS"></span>
+              </i>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content">
+        <h4>
+          <span i18ntag="discordServer"></span>
+          <a href="https://discord.gg/b2hjP3PK3S">
+            <img src="Discord-Logo-Black.png" alt="Chessconnect Discord server" style="height: 25px; cursor: pointer" />
+          </a>
+        </h4>
+      </div>
+      <div class="licenses">
+        <p>
+          Chessconnect for Android uses the excellent Android BLE library by Nordic Semiconductor, which is licensed
+          under
+          <a href="https://github.com/NordicSemiconductor/Android-BLE-Library/blob/main/LICENSE">this license</a>.
+        </p>
+        <p>
+          It also uses usb-serial-for-android, which is licensed under
+          <a href="https://github.com/mik3y/usb-serial-for-android/blob/master/LICENSE.txt">these terms</a>.
+        </p>
+      </div>
+    </main>
+
+    <script src="../../dist/optiondlg.js"></script>
+  </body>
+</html>

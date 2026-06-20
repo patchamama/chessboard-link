@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" style="min-width: 700px; min-height: 600px">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chessconnect Debug Board</title>
+    <style>
+      .clock {
+        position: absolute;
+        font-size: 150%;
+      }
+      .inline-container {
+        display: inline-block; /* Set the container to inline-block */
+      }
+      .inline-item {
+        display: inline-block; /* Set the elements to inline-block */
+        margin: 10px; /* Add some margin for spacing */
+        padding: 5px;
+        border: 1px solid #ccc; /* Add a border for styling */
+      }
+    </style>
+  </head>
+
+  <body>
+    <img src="chessboard.svg" width="50%" id="chessboard" />
+    <p id="clock_black" class="clock">clock_black</p>
+    <p id="clock_white" class="clock">clock_white</p>
+    <p id="clock_text" class="clock">clock_text</p>
+    <br />
+    <div class="inline-container">
+      <p id="connectedElement" class="inline-item">not connected</p>
+      <button id="copy_site_position" class="inline-item" disabled>Copy site position</button>
+      <button id="flip_position" class="inline-item">Flip position</button>
+      <select id="select_piece" class="inline-item">
+        <option value="0">No piece</option>
+        <option value="2">Black Pawn</option>
+        <option value="4">Black Rook</option>
+        <option value="8">Black Knight</option>
+        <option value="16">Black Bishop</option>
+        <option value="32">Black King</option>
+        <option value="64">Black Queen</option>
+        <option value="3">White Pawn</option>
+        <option value="5">Whtie Rook</option>
+        <option value="9">White Knight</option>
+        <option value="17">White Bishop</option>
+        <option value="33">White King</option>
+        <option value="65">White Queen</option>
+      </select>
+      <div id="mode_indicator" class="inline-item"></div>
+    </div>
+    <script src="../dist/debugboardgui.js"></script>
+  </body>
+</html>
