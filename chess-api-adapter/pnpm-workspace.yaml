@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# esbuild ships a postinstall that fetches its native binary; allow it so
+# vitest/tsup can run. (The parent monorepo allows the same.)
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: set this to true or false

@@ -1,0 +1,15 @@
+{
+  "name": "chess-api-adapter-workspace",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Workspace for chess-board-link library and its web test app.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm --filter chess-board-link build",
+    "test": "pnpm --filter chess-board-link test",
+    "dev": "pnpm --filter @chess-board-link/web-test dev"
+  }
+}
