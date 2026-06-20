@@ -77,12 +77,18 @@ export function useStockfish(): StockfishApi {
     workerRef.current?.postMessage(cmd);
   }, []);
 
+  /**
+   * Analyse a position, refining progressively. Stockfish streams an
+   * `info depth N score …` line for every depth from 1 up to `maxDepth`, so the
+   * eval bar starts moving almost immediately (≈depth 10) and keeps sharpening
+   * up to `maxDepth` (30). We keep the previous eval visible while it deepens
+   * instead of blanking it, for a smooth refinement.
+   */
   const analyse = useCallback(
-    (fen: string, depth = 14) => {
+    (fen: string, maxDepth = 30) => {
       send('stop');
-      setEvaluation(null);
       send(`position fen ${fen}`);
-      send(`go depth ${depth}`);
+      send(`go depth ${maxDepth}`);
     },
     [send],
   );

@@ -1,0 +1,52 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Lint, typecheck, test and build on every push/PR.
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter chess-board-link build
+      - run: pnpm --filter chess-board-link test
+      - run: pnpm --filter @chess-board-link/web-test exec tsc --noEmit
+      - run: pnpm --filter @chess-board-link/web-test test
+      - name: Build web app
+        env:
+          GITHUB_PAGES: '1'
+        run: pnpm --filter @chess-board-link/web-test build
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: apps/web-test/dist
+
+  # Publish the built app to GitHub Pages, only on main.
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

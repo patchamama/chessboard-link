@@ -17,6 +17,8 @@ import { useChessGame } from './game/useChessGame.js';
 import { useStockfish } from './game/useStockfish.js';
 import { useBoardSessions } from './boards/useBoardSessions.js';
 import { START_FEN } from './boards/boardStorage.js';
+import { useTheme } from './useTheme.js';
+import { PlayIcon, PauseIcon, SunIcon, MoonIcon } from './components/Icons.js';
 import { APP_VERSION } from './version.js';
 
 export function App() {
@@ -26,6 +28,7 @@ export function App() {
   const active = sessions[activeId];
   const game = useChessGame(active?.fen ?? START_FEN);
   const sf = useStockfish();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [knownDevices, setKnownDevices] = useState<string[]>([]);
@@ -58,7 +61,7 @@ export function App() {
 
   // Analyse the current position whenever it changes and the engine is ready.
   useEffect(() => {
-    if (sf.ready) sf.analyse(game.fen, 14);
+    if (sf.ready) sf.analyse(game.fen, 30); // progressive: streams depth 1→30
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.fen, sf.ready]);
 
@@ -147,6 +150,15 @@ export function App() {
       <header className="banner">
         <strong>chess-board-link</strong> · web test
         <span className="version">v{APP_VERSION}</span>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </button>
       </header>
 
       <BoardTabs
@@ -192,14 +204,16 @@ export function App() {
           />
           Flip
         </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={cfg?.botEnabled ?? false}
-            onChange={(e) => updateConfig(activeId, { botEnabled: e.target.checked })}
-          />
-          Bot {sf.ready ? '' : '(loading…)'}
-        </label>
+        <button
+          type="button"
+          className={`play-btn ${cfg?.botEnabled ? 'playing' : ''}`}
+          disabled={!sf.ready}
+          onClick={() => updateConfig(activeId, { botEnabled: !cfg?.botEnabled })}
+          title={cfg?.botEnabled ? 'Stop playing vs bot' : 'Play vs bot'}
+        >
+          {cfg?.botEnabled ? <PauseIcon /> : <PlayIcon />}
+          {cfg?.botEnabled ? 'Stop bot' : sf.ready ? 'Play vs bot' : 'Bot loading…'}
+        </button>
         <label>
           Bot plays&nbsp;
           <select

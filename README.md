@@ -65,6 +65,14 @@ update without any physical board.
 hardware (ships flagged `experimental`). Full details and the remaining boards:
 [PROTOCOLS.md](./packages/chess-board-link/PROTOCOLS.md).
 
+## Deploy
+
+Pushing to `main` runs CI (typecheck + tests + build) and deploys the web test
+app to **GitHub Pages** via `.github/workflows/deploy.yml`. Enable Pages in the
+repo settings (Source: GitHub Actions). The published app lives at
+`https://patchamama.github.io/chessboard-link/`. The Vite `base` path is set
+automatically in CI through the `GITHUB_PAGES` env var.
+
 ## Online platforms
 
 - **Lichess** — official Board API (needs a `board:play` token).

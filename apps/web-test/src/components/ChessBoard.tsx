@@ -1,10 +1,23 @@
 import { useState } from 'react';
 import { fenToBoard, indexToSquare, squareToIndex } from 'chess-board-link';
 
-const GLYPHS: Record<string, string> = {
-  P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔',
-  p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚',
+// Piece sprites from lichess's CDN (Cburnett set, free/GPL). Filenames are
+// <Color><PieceUpper>.svg, e.g. wP.svg, bN.svg.
+const PIECE_BASE = 'https://lichess1.org/assets/piece/cburnett';
+
+function pieceSrc(piece: string): string {
+  const color = piece === piece.toUpperCase() ? 'w' : 'b';
+  return `${PIECE_BASE}/${color}${piece.toUpperCase()}.svg`;
+}
+
+const PIECE_NAMES: Record<string, string> = {
+  P: 'pawn', N: 'knight', B: 'bishop', R: 'rook', Q: 'queen', K: 'king',
 };
+
+function pieceLabel(piece: string): string {
+  const color = piece === piece.toUpperCase() ? 'white' : 'black';
+  return `${color} ${PIECE_NAMES[piece.toUpperCase()] ?? 'piece'}`;
+}
 
 interface ChessBoardProps {
   /** Position to render (FEN placement or full FEN). */
@@ -68,7 +81,9 @@ export function ChessBoard({ fen, legalTargets, onMove, lastMove, flipped }: Che
             data-square={square}
             onClick={() => clickSquare(square, piece)}
           >
-            {piece ? <span className="piece">{GLYPHS[piece]}</span> : null}
+            {piece ? (
+              <img className="piece" src={pieceSrc(piece)} alt={pieceLabel(piece)} draggable={false} />
+            ) : null}
             {isTarget ? <span className="dot" /> : null}
           </button>
         );
