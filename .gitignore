@@ -4,3 +4,8 @@ dist/
 .DS_Store
 coverage/
 .playwright-mcp/
+
+# Proprietary third-party reference (minified ChessConnect extension) — kept
+# locally for reverse-engineering, never committed. Protocols live in
+# packages/chess-board-link/PROTOCOLS.md.
+reference/chessconnect-extension/
