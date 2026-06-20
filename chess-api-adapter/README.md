@@ -12,8 +12,12 @@ extension and open-source projects.
   [README](./packages/chess-board-link/README.md) for usage and
   [PROTOCOLS.md](./packages/chess-board-link/PROTOCOLS.md) for the wire formats
   of all 15 boards in the extension.
-- **`apps/web-test`** — a React 19 + Vite app to connect to a board and watch
-  the live position, with a hardware-free **Mock** board.
+- **`apps/web-test`** — a React 19 + Vite **play app**: interactive board
+  (moves validated by chess.js), play vs a **Stockfish** bot (loaded from CDN),
+  live **eval bar** + FEN, several boards at once (tabs), session **persistence**
+  across refreshes, one-click Bluetooth **reconnect**, and physical-board
+  controls (light a move on the board, sync, etc.). A hardware-free **Mock**
+  board lets you try it all without hardware.
 
 ## Getting started
 

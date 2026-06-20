@@ -1,4 +1,4 @@
-import { BaseBoardAdapter } from '../../core/BoardAdapter.js';
+import { BaseBoardAdapter, type ConnectOptions } from '../../core/BoardAdapter.js';
 import type { TransportType } from '../../core/types.js';
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
@@ -37,10 +37,21 @@ export class IChessOneAdapter extends BaseBoardAdapter {
     this.transport.setDisconnectHandler(() => this.setStatus('disconnected'));
   }
 
-  async connect(): Promise<void> {
+  get deviceId(): string | undefined {
+    return this.transport.deviceId;
+  }
+
+  get deviceName(): string | undefined {
+    return this.transport.deviceName;
+  }
+
+  async connect(opts: ConnectOptions = {}): Promise<void> {
     this.setStatus('connecting');
     try {
-      await this.transport.connect();
+      const device = opts.deviceId
+        ? await WebBluetoothTransport.findKnownDevice(opts.deviceId)
+        : undefined;
+      await this.transport.connect({ device });
       this.setStatus('connected');
     } catch (error) {
       this.setStatus('error');

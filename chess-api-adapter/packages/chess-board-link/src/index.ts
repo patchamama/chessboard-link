@@ -6,7 +6,11 @@
 // Core
 export * from './core/types.js';
 export { TypedEventEmitter } from './core/EventEmitter.js';
-export { BaseBoardAdapter, type BoardAdapter } from './core/BoardAdapter.js';
+export {
+  BaseBoardAdapter,
+  type BoardAdapter,
+  type ConnectOptions,
+} from './core/BoardAdapter.js';
 export { BoardRegistry, type BoardRegistration } from './core/BoardRegistry.js';
 export {
   emptyBoard,
@@ -16,6 +20,7 @@ export {
   boardsEqual,
 } from './core/boardState.js';
 export { detectMove, type DetectMoveOptions } from './core/moveDetection.js';
+export { highlightMove, clearLeds } from './core/ledHelpers.js';
 
 // Utils
 export { indexToSquare, squareToIndex } from './utils/squares.js';

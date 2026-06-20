@@ -32,6 +32,40 @@ export class WebBluetoothTransport {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
   }
 
+  /**
+   * Devices the user has already granted access to (Chrome only). Used to
+   * reconnect after a page refresh without showing the picker again.
+   */
+  static async getKnownDevices(): Promise<BluetoothDevice[]> {
+    if (!WebBluetoothTransport.isSupported()) return [];
+    const bt = navigator.bluetooth as Bluetooth & {
+      getDevices?: () => Promise<BluetoothDevice[]>;
+    };
+    if (typeof bt.getDevices !== 'function') return [];
+    try {
+      return await bt.getDevices();
+    } catch {
+      return [];
+    }
+  }
+
+  /** Find a previously-granted device by id (for one-click reconnect). */
+  static async findKnownDevice(
+    deviceId: string,
+  ): Promise<BluetoothDevice | undefined> {
+    const devices = await WebBluetoothTransport.getKnownDevices();
+    return devices.find((d) => d.id === deviceId);
+  }
+
+  /** The connected device's id (stable per origin), for persistence. */
+  get deviceId(): string | undefined {
+    return this.device?.id;
+  }
+
+  get deviceName(): string | undefined {
+    return this.device?.name;
+  }
+
   /** Register the inbound-data callback. Call before {@link connect}. */
   setDataHandler(handler: (data: DataView) => void): void {
     this.onData = handler;
@@ -41,22 +75,29 @@ export class WebBluetoothTransport {
     this.onDisconnect = handler;
   }
 
-  async connect(): Promise<void> {
+  /**
+   * @param opts.device a previously-known device (from {@link getKnownDevices})
+   *   to reconnect to without showing the picker.
+   */
+  async connect(opts: { device?: BluetoothDevice } = {}): Promise<void> {
     if (!WebBluetoothTransport.isSupported()) {
       throw new Error('Web Bluetooth is not available in this browser');
     }
     const { serviceUuid, notifyCharacteristicUuid, writeCharacteristicUuid, namePrefixes } =
       this.options;
 
-    const filters: BluetoothLEScanFilter[] = [{ services: [serviceUuid] }];
-    if (namePrefixes?.length) {
-      for (const namePrefix of namePrefixes) filters.push({ namePrefix });
+    if (opts.device) {
+      this.device = opts.device;
+    } else {
+      const filters: BluetoothLEScanFilter[] = [{ services: [serviceUuid] }];
+      if (namePrefixes?.length) {
+        for (const namePrefix of namePrefixes) filters.push({ namePrefix });
+      }
+      this.device = await navigator.bluetooth.requestDevice({
+        filters,
+        optionalServices: [serviceUuid],
+      });
     }
-
-    this.device = await navigator.bluetooth.requestDevice({
-      filters,
-      optionalServices: [serviceUuid],
-    });
 
     this.device.addEventListener('gattserverdisconnected', () => {
       this.onDisconnect?.();

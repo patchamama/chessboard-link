@@ -16,14 +16,28 @@ import type {
  * plumbing and move detection so subclasses only decode their protocol and
  * call {@link BaseBoardAdapter.pushBoardState} with each fresh snapshot.
  */
+/** Options for {@link BoardAdapter.connect}. */
+export interface ConnectOptions {
+  /**
+   * For Bluetooth adapters: the id of a previously-paired device to reconnect
+   * to without showing the picker (one-click reconnect after a refresh).
+   */
+  deviceId?: string;
+}
+
 export interface BoardAdapter {
   readonly id: string;
   readonly name: string;
   readonly transportType: TransportType;
   readonly status: ConnectionStatus;
 
-  connect(): Promise<void>;
+  connect(opts?: ConnectOptions): Promise<void>;
   disconnect(): Promise<void>;
+
+  /** Id of the connected Bluetooth device (for persistence), if any. */
+  readonly deviceId?: string;
+  /** Name of the connected Bluetooth device, if any. */
+  readonly deviceName?: string;
 
   /** Latest known board snapshot (a8..h1 order). */
   getState(): BoardState;
@@ -56,7 +70,16 @@ export abstract class BaseBoardAdapter
     return this._state;
   }
 
-  abstract connect(): Promise<void>;
+  /** Overridden by Bluetooth adapters that expose a device id. */
+  get deviceId(): string | undefined {
+    return undefined;
+  }
+
+  get deviceName(): string | undefined {
+    return undefined;
+  }
+
+  abstract connect(opts?: ConnectOptions): Promise<void>;
   abstract disconnect(): Promise<void>;
 
   protected setStatus(status: ConnectionStatus): void {
