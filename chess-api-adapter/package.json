@@ -9,7 +9,13 @@
   },
   "scripts": {
     "build": "pnpm --filter chess-board-link build",
+    "build:lib": "pnpm --filter chess-board-link build",
+    "build:app": "pnpm --filter @chess-board-link/web-test build",
     "test": "pnpm --filter chess-board-link test",
-    "dev": "pnpm --filter @chess-board-link/web-test dev"
+    "typecheck": "pnpm --filter chess-board-link typecheck && pnpm --filter @chess-board-link/web-test exec tsc --noEmit",
+    "dev": "pnpm run build:lib && pnpm --filter @chess-board-link/web-test dev",
+    "dev:app": "pnpm --filter @chess-board-link/web-test dev",
+    "preview": "pnpm --filter @chess-board-link/web-test preview",
+    "start": "pnpm run dev"
   }
 }

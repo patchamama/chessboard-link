@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Chessconnect DGT Test Page</title>
+  </head>
+
+  <body>
+    <button id="connect">Connect</button>
+  </body>
+
+  <script>
+    const BAUD_RATE = 9600;
+    const PARITY = 'none';
+    const DATA_BITS = 8;
+    const STOP_BITS = 1;
+    const DGT_REQ_BOARD = 0x42;
+    const DGT_SET_LEDS = 0x60;
+    const DGT_SEND_UPDATE_BOARD = 0x44;
+    const DGT_REQ_TRADEMARK = 0x47;
+    const DGT_MSG_TRADEMARK = 0x92;
+
+    const RECONNECT_POLL_MS = 2000;
+    const SEND_AND_WAIT_TIMEOUT = 700;
+    const SEND_AND_WAIT_RETRIES = 1;
+    const REQUEST_POSITION_MS = 500;
+
+    let reader;
+    let currentIncomingMessage;
+    let sendAndWaitBuffer;
+    let boardDumpTimeout;
+    let port;
+    let isConnected = false;
+
+    startReconnectService();
+    const connectButton = document.getElementById('connect');
+    connectButton.addEventListener('click', async () => {
+      const port = await navigator.serial.requestPort();
+      connectToPort(port);
+    });
+
+    async function connectToPort(pport) {
+      port = pport;
+      try {
+        await port.close();
+      } catch (e) {
+        console.warn('Error closing port:', e);
+      }
+
+      try {
+        await pport.open({
+          baudRate: BAUD_RATE,
+          dataBits: DATA_BITS,
+          parity: PARITY,
+          stopBits: STOP_BITS,
+        });
+      } catch (e) {
+        console.warn('Error opening port:', e);
+      }
+      void readFromPort(port);
+
+      if (sendAndWaitBuffer) {
+        sendAndWaitBuffer.isCanceled = true;
+      }
+      sendAndWaitBuffer = new SendAndWaitBuffer(SEND_AND_WAIT_TIMEOUT, SEND_AND_WAIT_RETRIES);
+
+      await sendInitCommands();
+
+      setBoardDumpTimeout();
+    }
+
+    async function sendInitCommands() {
+      const trademark = await this.sendAndWait(new Message(DGT_REQ_TRADEMARK), DGT_MSG_TRADEMARK, 'Trademark');
+      console.log('Trademark: ' + trademark.toString());
+      console.log('## IF TRADEMARK IS NOT EMPTY THEN BOARD IS NOW SUCCESSFULLY CONNECTED ##');
+      if (trademark.data.length > 0) {
+        isConnected = true;
+      }
+
+      await this.sendDataToBoard(new Message(DGT_SET_LEDS, [2, 1, 0]));
+      await this.sendDataToBoard(new Message(DGT_SET_LEDS, [2, 2, 0]));
+
+      await this.sendDataToBoard(new Message(DGT_SEND_UPDATE_BOARD));
+      await this.sendDataToBoard(new Message(DGT_REQ_BOARD));
+    }
+
+    async function readFromPort(port) {
+      try {
+        reader = port.readable.getReader();
+      } catch (error) {
+        console.warn(error);
+      }
+      try {
+        let data = await reader.read();
+        while (!data.done) {
+          await parseInputData(data.value);
+          data = await reader.read();
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        reader?.releaseLock();
+      }
+    }
+
+    async function parseInputData(data) {
+      for (const byte of data) {
+        if (byte & 0x80) {
+          currentIncomingMessage = new Message(byte);
+        } else if (currentIncomingMessage) {
+          if (currentIncomingMessage.size === undefined) {
+            currentIncomingMessage.size = byte << 7;
+            currentIncomingMessage.data = [];
+            currentIncomingMessage.needSecondSizeByte = true;
+          } else if (currentIncomingMessage.needSecondSizeByte) {
+            currentIncomingMessage.size += byte & 0x7f;
+            currentIncomingMessage.needSecondSizeByte = false;
+          } else {
+            currentIncomingMessage.data.push(byte);
+            if (currentIncomingMessage.data.length >= currentIncomingMessage.size - 3) {
+              await handleMessageFromBoard(currentIncomingMessage);
+              currentIncomingMessage = null;
+            }
+          }
+        }
+      }
+    }
+
+    async function handleMessageFromBoard(message) {
+      sendAndWaitBuffer.receive(message);
+    }
+
+    function setBoardDumpTimeout() {
+      boardDumpTimeout = setTimeout(() => {
+        void this.sendDataToBoard(new Message(DGT_REQ_BOARD));
+      }, REQUEST_POSITION_MS);
+    }
+
+    async function sendAndWait(message, replyCommand, comment) {
+      return await sendAndWaitBuffer.send(
+        () => {
+          void sendDataToBoard(message);
+        },
+        (reply) => {
+          return reply.command === replyCommand;
+        },
+        comment,
+      );
+    }
+
+    async function sendDataToBoard(message) {
+      const data = encodeMessage(message);
+      let success = false;
+      while (port && !success) {
+        try {
+          const writer = port.writable.getWriter();
+          await writer.write(data);
+          writer.releaseLock();
+          success = true;
+        } catch (e) {
+          await sleep(250);
+        }
+      }
+    }
+
+    function encodeMessage(message) {
+      if (!message.size) {
+        return Uint8Array.from([message.command]);
+      } else {
+        const result = new Uint8Array(message.size + 3);
+        result[0] = message.command;
+        result[1] = message.size + 1;
+        result.set(message.data, 2);
+        result[result.length - 1] = 0;
+        return result;
+      }
+    }
+
+    function startReconnectService() {
+      let reconnectInProgress = false;
+
+      const interval = setInterval(() => {
+        if (!reconnectInProgress) {
+          reconnectInProgress = true;
+          if (!isConnected) {
+            tryReconnect()
+              .then(() => {
+                reconnectInProgress = false;
+              })
+              .catch(() => {
+                reconnectInProgress = false;
+              });
+          }
+        }
+      }, RECONNECT_POLL_MS);
+    }
+
+    async function tryReconnect() {
+      if (typeof navigator.serial?.getPorts === 'function') {
+        const ports = await navigator.serial.getPorts();
+        for (const port of ports) {
+          if (!isConnected) {
+            try {
+              await connectToPort(port);
+              return;
+            } catch (e) {
+              console.warn('Error reconnecting to port:', e);
+            }
+          }
+        }
+      }
+    }
+
+    //--------------------------------------------------------------------------------
+    class SendAndWaitBuffer {
+      isCanceled = false;
+      timeoutMs;
+      maxRetries;
+      tasks = [];
+
+      constructor(timeoutMs, maxRetries) {
+        this.timeoutMs = timeoutMs ?? 0;
+        this.maxRetries = maxRetries ?? 0;
+      }
+
+      send(sendFunc, testFunc, comment) {
+        const task = new SendAndWaitTask(this, sendFunc, testFunc, this.timeoutMs, this.maxRetries, comment);
+        this.tasks.push(task);
+        sendFunc();
+        return task.promise;
+      }
+
+      receive(msg) {
+        if (this.isCanceled) {
+          return false;
+        } else {
+          for (let i = 0; i < this.tasks.length; i++) {
+            if (this.tasks[i].handle(msg)) {
+              this.tasks.splice(i, 1);
+              return true;
+            }
+          }
+          return false;
+        }
+      }
+
+      cancelAll(comment) {
+        this.tasks.forEach((task) => {
+          if (!comment || task.comment === comment) {
+            task.rejector(new Error('Task was canceled. This is no error'));
+          }
+        });
+        this.tasks = this.tasks.filter((task) => task.comment !== comment);
+      }
+    }
+
+    class SendAndWaitTask {
+      buffer;
+      sendFunc;
+      testFunc;
+      timeout;
+      retryCount;
+      promise;
+      resolver;
+      rejector;
+      comment;
+
+      constructor(buffer, sendFunc, testFunc, timeOutMs, retries, comment) {
+        this.buffer = buffer;
+        this.sendFunc = sendFunc;
+        this.testFunc = testFunc;
+        this.retryCount = retries;
+        this.comment = comment;
+
+        this.promise = new Promise((resolve, reject) => {
+          this.resolver = resolve;
+          this.rejector = reject;
+        });
+
+        if (timeOutMs > 0) {
+          this.timeout = setTimeout(() => {
+            this.retry(timeOutMs);
+          }, timeOutMs);
+        }
+      }
+
+      retry(timeOutMs) {
+        if (--this.retryCount >= 0 && !this.buffer.isCanceled) {
+          this.sendFunc();
+          if (timeOutMs > 0) {
+            this.timeout = setTimeout(() => {
+              this.retry(timeOutMs);
+            }, timeOutMs);
+          }
+        } else {
+          console.warn('sendAndWait giving up for ' + this.comment);
+          this.rejector(new Error('Timeout'));
+        }
+      }
+
+      handle(msg) {
+        if (!this.buffer.isCanceled && this.testFunc(msg)) {
+          if (this.timeout) {
+            clearTimeout(this.timeout);
+          }
+          this.resolver(msg);
+          return true;
+        } else {
+          return false;
+        }
+      }
+    }
+
+    class Message {
+      command;
+      size;
+      data;
+      needSecondSizeByte = false;
+
+      constructor(command, data) {
+        this.command = command;
+        this.data = data;
+        if (data) {
+          this.size = data.length;
+        }
+      }
+
+      static byteArrayToHexString(data) {
+        let result = '';
+        for (const byte of data) {
+          result += byte.toString(16) + ' ';
+        }
+        return result;
+      }
+
+      toString() {
+        return this.command + ': ' + (this.data ? Message.byteArrayToHexString(new Uint8Array(this.data)) : '');
+      }
+    }
+
+    function sleep(msecs) {
+      return new Promise((r) => setTimeout(r, msecs));
+    }
+  </script>
+</html>

@@ -112,15 +112,19 @@ const adapter = registry.create('dgt');
 
 ## Supported boards
 
-| Board    | Transport       | Protocol source                                   | Status        |
-|----------|-----------------|---------------------------------------------------|---------------|
-| Chessnut Air / Pro | Web Bluetooth | `paulvonallwoerden/chessnut-air`, `rmarabini/chessnutair` | ✅ Implemented |
-| DGT e-Board | Web Serial (USB) | Official DGT protocol header (`dgtbrd13.h`), `fnogatz/dgtchess` | ✅ Implemented |
-| ChessUp  | Web Bluetooth   | ChessConnect extension (Nordic UART, opcode 163)  | ✅ Implemented* |
-| Mock     | — (no hardware) | —                                                 | ✅ For dev/demo |
-| iChessOne, GoChess, Millennium, Certabo, Tabutronic, … | BLE / USB | ChessConnect extension | ⏳ Documented in [PROTOCOLS.md](./PROTOCOLS.md) |
+Three columns: **1. Board** · **2. What it does** (status + transport) ·
+**3. What it ships** (the protocol pieces implemented in this library).
 
-\* ChessUp's protocol is verified from the extension's source, not yet tested
+| 1. Board | 2. What it does | 3. What it ships |
+|----------|-----------------|------------------|
+| **Chessnut** Air / Pro | ✅ Real-time board reads over **Web Bluetooth (BLE)** | UUIDs (`1b7e826x`), enable cmd `0x21 0x01 0x00`, 32-byte→64-nibble decode (`r=7-⌊i/4⌋, c=7-(i%4)*2`), `CHESSNUT_PIECE_LUT`, LED bitmap |
+| **DGT** e-Board | ✅ Move/position reads over **Web Serial (USB)**, 9600 baud | Commands `0x40/0x42/0x4b`, framed `BOARD_DUMP 0x06` / `FIELD_UPDATE 0x0e`, 0–12 piece codes, message reader |
+| **ChessUp** | 🧪 Move events over **BLE (Nordic UART)** — verified from source, not hardware | UUIDs `6e40000x`, opcodes (163 move / 151 promo / 184 touch / 38 err), `[163,53,fromRow,fromCol,toRow,toCol]` parse, castling normalisation, ACK |
+| **iChessOne** | 🧪 Position reads over **BLE (Nordic UART)** — verified from source | UUIDs `6e40000x`, ASCII position frame (`'s'`+64 chars), index `7-file+1+8*rank`, command-length map |
+| **Mock** | ✅ No hardware — scripted snapshots for dev/demo | Starting position, `applyBoardState()`, `playback()` |
+| GoChess, Millennium, Certabo, Tabutronic/Sentio, Staunton, Yizhi, SenseRobot, Phantom, ManyaCynus, DGT Pegasus/Revelation II | ⏳ Not ported | UUIDs / init / transport documented in [PROTOCOLS.md](./PROTOCOLS.md) |
+
+🧪 = protocol verified from the ChessConnect extension source, not yet tested
 against a physical board, so it ships flagged `experimental` in the registry.
 
 ### Chessnut protocol (verified)

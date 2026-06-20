@@ -1,0 +1,555 @@
+{
+   "AnnounceMove": {
+      "description": "Announce the move via text to speech",
+      "message": "Powiedz ruch"
+   },
+   "ApiToken": {
+      "description": "tab label for API token management",
+      "message": "Token API"
+   },
+   "AppleBLEOnlyWarning": {
+      "description": "Warning message for Apple devices that only support Bluetooth LE",
+      "message": "Z przyczyn niezależnych ode mnie Chessconnect nie obsługuje USB ani Bluetooth Classic na systemie iOS."
+   },
+   "Beep": {
+      "description": "Select a beeping sound",
+      "message": "Odtwarzaj dźwięk"
+   },
+   "BlackWins": {
+      "description": "announcement when black wins the game",
+      "message": "czarne wygrywają"
+   },
+   "BoardOptions": {
+      "description": "Tab label for board specific options",
+      "message": "Szachownica"
+   },
+   "BuyCoffee": {
+      "message": "kupić mi kawę"
+   },
+   "CHECKING_TOKEN": {
+      "description": "Text that is displayed while a lichess token is checked.",
+      "message": "Sprawdzanie tokena..."
+   },
+   "Cancel": {
+      "description": "Cancel an operation",
+      "message": "Anuluj"
+   },
+   "ChessClockDisplay": {
+      "message": "Wyświetlacz zegara szachowego"
+   },
+   "Chessboard": {
+      "message": "Szachownica"
+   },
+   "ChoosePromotion": {
+      "description": "Asks into which piece a pawn should be promoted",
+      "message": "Wybierz figurę do promocji:"
+   },
+   "ClockPlayerLeft": {
+      "description": "Label for the checkbox to display the player's time on the left side of the clock",
+      "message": "Wyświetl czas gracza po lewej stronie zegara"
+   },
+   "ClockPlayerRight": {
+      "description": "Label for the checkbox to display the player's time on the right side of the clock",
+      "message": "Wyświetl czas gracza po prawej stronie zegara"
+   },
+   "ConfirmExitApp": {
+      "description": "Asks for confirmation before exiting to Phoenix main menu",
+      "message": "Czy na pewno chcesz wyjść z tej aplikacji?"
+   },
+   "ConfirmPairTapnSet": {
+      "description": "Message displayed when the user wants to pair the Tap'n'Set clock",
+      "message": "Czy chcesz teraz sparować adapter Chessconnect TapNset-Pro?"
+   },
+   "Connect": {
+      "descripton": "Text for the connect button if not connected to a board",
+      "message": "Połącz"
+   },
+   "Connected": {
+      "descripton": "Text for the connect button, when connected to a board",
+      "message": "Połączono"
+   },
+   "ConnectionMethod": {
+      "description": "Ask the user to select either Bluetooth or USB",
+      "message": "Metoda połączenia"
+   },
+   "DEBUG_MESSAGES_WARNING": {
+      "description": "extra hint for the debug messages switch",
+      "message": "(zaznacz tylko, jeśli coś nie działa)"
+   },
+   "Enter_API_token": {
+      "description": "Placeholder for an input field for a lichess API token",
+      "message": "Wprowadź token API"
+   },
+   "Enter_username": {
+      "description": "Placeholder for an input field for a username",
+      "message": "Wprowadź nazwę użytkownika"
+   },
+   "ExitApp": {
+      "description": "Label for the button that exits to Phoenix main menu",
+      "message": "Wyjdź z aplikacji"
+   },
+   "FLAGS_INFO": {
+      "message": "Spróbuj ustawić flagi Chrome: chrome://flags/#enable-web-bluetooth, chrome://flags/#enable-web-bluetooth-new-permissions-backend, chrome://flags/#enable-experimental-web-platform-features"
+   },
+   "FORGET_PIECES_WARNING": {
+      "message": "Czy na pewno chcesz, aby Chessconnect zapomniał wszystkie zapamiętane figury szachowe?"
+   },
+   "ForgetLearnedChessPieces": {
+      "description": "For TabuTronic board. Forget all RFIDs",
+      "message": "Zapomnij nauczone figury szachowe"
+   },
+   "GoForHelp": {
+      "description": "This is followed by the URL to the chessconnect web site",
+      "message": "Jeśli potrzebujesz więcej pomocy, odwiedź"
+   },
+   "I_Understand": {
+      "description": "Button text for the button to confirm that the user has read and understood a warning message",
+      "message": "Rozumiem"
+   },
+   "InitConnectedBoardMessage": {
+      "message": "Chessconnect używa oficjalnego interfejsu dla elektronicznych szachownic. Aby przenieść ruchy na $website$, wymagana jest jednorazowo Twoja zgoda. Czy chcesz wyrazić zgodę teraz?",
+      "placeholders": {
+         "website": {
+            "content": "$1",
+            "example": "chess.com"
+         }
+      }
+   },
+   "KnockWood": {
+      "description": "Select a knocking sound",
+      "message": "Stukanie w drewno"
+   },
+   "KnownPieces": {
+      "description": "For TabuTronic board: message when new RFID chips have been recognized",
+      "message": "$n$ figur może być teraz rozpoznanych.",
+      "placeholders": {
+         "n": {
+            "content": "$1",
+            "example": "3"
+         }
+      }
+   },
+   "LEARN_RFIDS": {
+      "message": "Ustaw wszystkie figury na ich pozycjach początkowych. Jeśli masz dodatkowe hetmany, umieść je na d3 i d6. Następnym razem, gdy Chessconect zostanie połączony z twoją planszą, zapamięta figury na planszy."
+   },
+   "LICHESS_TIME_FORMATS": {
+      "message": "Na lichess.org Chessconnect obsługuje tylko Rapid, Classical i Correspondence. W przypadku bezpośrednich wyzwań i gier przeciwko AI możliwy jest również Blitz."
+   },
+   "LICHESS_TOKEN_ERROR": {
+      "message": "Dostęp nieudany. Sprawdź token. Wymagane jest co najmniej prawo board:play. Sprawdź również, czy nie ma literówek."
+   },
+   "LICHESS_TOKEN_HINT": {
+      "message": "Token API wymaga tylko dostępu do board:play. Można go uzyskać w sekcji ustawień Twojego profilu użytkownika."
+   },
+   "LICHESS_TOKEN_WARNING": {
+      "message": "Najpierw wprowadź token API na stronie opcji Chessconnect. Token musi mieć prawo dostępu do board:play."
+   },
+   "LICHESS_USER_WARNING": {
+      "message": "Chessconnect nie mógł znaleźć Twojej nazwy użytkownika Lichess w tej grze. Sprawdź swoje opcje Chessconnect."
+   },
+   "Language": {
+      "description": "Label for language selection dialog.",
+      "message": "Język"
+   },
+   "LedColor": {
+      "description": "Color of chess board LEDs",
+      "message": "Kolor LED"
+   },
+   "MISPLACED_WARNING": {
+      "message": "$piece$ na polu $field$ jest źle ustawiony",
+      "placeholders": {
+         "field": {
+            "content": "$2",
+            "example": "e 2"
+         },
+         "piece": {
+            "content": "$1",
+            "example": "pion"
+         }
+      }
+   },
+   "MOVE_METHOD_WARNING": {
+      "message": "Twoje ustawienia na chess.com pokazują inną metodę ruchu niż \"klikanie w pola\". Zmień ją na klikanie w pola, aby Chessconnect działał poprawnie."
+   },
+   "MoveLatencyInMs": {
+      "description": "milliseconds to wait before a move is transmitted",
+      "message": "Opóźnienie ruchu w ms"
+   },
+   "NEED_LOGIN": {
+      "message": "Zaloguj się najpierw na $website$ przed użyciem Chessconnect.",
+      "placeholders": {
+         "website": {
+            "content": "$1",
+            "example": "chess.com"
+         }
+      }
+   },
+   "NO_CONNECTION_MANAGER": {
+      "message": "Parametry połączenia nieprawidłowe. Sprawdź opcje."
+   },
+   "NewPiecesMemorized": {
+      "description": "For TabuTronic board: message when new RFID chips have been recognized",
+      "message": "Zapamiętano $n$ nowych figur",
+      "placeholders": {
+         "n": {
+            "content": "$1",
+            "example": "3"
+         }
+      }
+   },
+   "No": {
+      "message": "Nie"
+   },
+   "NoBLE": {
+      "message": "Bluetooth LE nie jest dostępny na tym urządzeniu."
+   },
+   "NoBleAPI": {
+      "message": "Ta przeglądarka nie obsługuje interfejsu Web Bluetooth API."
+   },
+   "NoClock": {
+      "message": "Brak podłączonego zegara"
+   },
+   "NoHidAPI": {
+      "message": "Ta przeglądarka nie obsługuje interfejsu Web HID API."
+   },
+   "NoReconnect": {
+      "message": "Ta przeglądarka nie obsługuje funkcji ponownego łączenia Bluetooth. Będziesz musiał ponownie połączyć się ręcznie po rozłączeniu."
+   },
+   "NoSerialAPI": {
+      "message": "Ta przeglądarka nie obsługuje interfejsu Web Serial API."
+   },
+   "Ok": {
+      "message": "OK"
+   },
+   "OnOpponentMove": {
+      "description": "Let the user select which sound to play when the opponent makes a move",
+      "message": "Po ruchu przeciwnika"
+   },
+   "Opponent": {
+      "description": "Label for the opponent name",
+      "message": "Przeciwnik"
+   },
+   "Options": {
+      "description": "title for the options dialog",
+      "message": "Opcje"
+   },
+   "PiecesInPlace": {
+      "message": "OK, wszystkie figury na miejscu"
+   },
+   "Player": {
+      "description": "Label for the player name",
+      "message": "Gracz"
+   },
+   "SECOND_TAB_ACTIVE": {
+      "message": "Chessconnect jest już aktywny w innej zakładce przeglądarki"
+   },
+   "Save": {
+      "description": "Save button in the option dialog",
+      "message": "Zapisz"
+   },
+   "Select": {
+      "description": "choose one of multiple options",
+      "message": "Wybierz"
+   },
+   "ShowDebugMessages": {
+      "message": "Pokaż wiadomości debugowania"
+   },
+   "SoundVolume": {
+      "description": "Label text for the sound volume slider",
+      "message": "Głośność dźwięku"
+   },
+   "StayQuiet": {
+      "description": "Do not play any sound",
+      "message": "Nie odtwarzaj dźwięku"
+   },
+   "SupportMe": {
+      "description": "This is followed by '..buy me a coffee'",
+      "message": "Jeśli podoba Ci się Chessconnect:"
+   },
+   "TOKEN_INPUT_HINT": {
+      "description": "Helptext for entering API token in option dialog",
+      "message": "Po wprowadzeniu tokena naciśnij tab, aby zweryfikować token i automatycznie pobrać nazwę użytkownika."
+   },
+   "TeachInPieces": {
+      "description": "For TabuTronic boards: start learning new RFID chips",
+      "message": "Ucz w figurach"
+   },
+   "TeachingOnlyCertabo": {
+      "message": "Uczenie figur jest wymagane tylko dla plansz Certabo i Cerno."
+   },
+   "Version": {
+      "description": "precedes the version number of this release",
+      "message": "Wersja"
+   },
+   "Voice": {
+      "description": "Label for voice selection",
+      "message": "Głos"
+   },
+   "WEBGL_WARNING": {
+      "message": "Twoja instancja chess.com używa WebGL. Spróbuj ustawić animacje figur na \"szybkie\" lub wolniejsze. W przeciwnym razie Chessconnect nie będzie działać."
+   },
+   "WHITE_ALWAYS_BOTTOM_WARNING": {
+      "message": "Masz włączoną opcję \"białe zawsze na dole\" w ustawieniach chess.com. Wyłącz to ustawienie i przeładuj tę stronę, aby Chessconnect działał poprawnie."
+   },
+   "WhiteLeft": {
+      "description": "The time for white is on the left side of the display",
+      "message": "Białe po lewej stronie wyświetlacza"
+   },
+   "WhiteRight": {
+      "description": "The time for white is on the right side of the display",
+      "message": "Białe po prawej stronie wyświetlacza"
+   },
+   "WhiteWins": {
+      "description": "announcement when white wins the game",
+      "message": "białe wygrywają"
+   },
+   "Yes": {
+      "message": "Tak"
+   },
+   "aborted": {
+      "message": "gra przerwana"
+   },
+   "andPromoteTo": {
+      "message": "i promuje do $piece$",
+      "placeholders": {
+         "piece": {
+            "content": "$1",
+            "example": "hetman"
+         }
+      }
+   },
+   "bishop": {
+      "description": "chess piece",
+      "message": "goniec"
+   },
+   "check": {
+      "description": "the king is in check",
+      "message": "szach"
+   },
+   "check_piece_on_field": {
+      "description": "Poproś użytkownika o sprawdzenie, czy figura szachowa na konkretnym polu jest poprawna",
+      "message": "Proszę sprawdzić figurę szachową na polu $field$",
+      "placeholders": {
+         "field": {
+            "content": "$1",
+            "example": "e 2"
+         }
+      }
+   },
+   "chessMove": {
+      "message": "$piece$ z $start_field$ na $end_field$",
+      "placeholders": {
+         "end_field": {
+            "content": "$3",
+            "example": "e 4"
+         },
+         "piece": {
+            "content": "$1",
+            "example": "pion"
+         },
+         "start_field": {
+            "content": "$2",
+            "example": "e 2"
+         }
+      }
+   },
+   "chessMoveTakes": {
+      "message": "$piece$ z $start_field$ bije na $end_field$",
+      "placeholders": {
+         "end_field": {
+            "content": "$3",
+            "example": "f 3"
+         },
+         "piece": {
+            "content": "$1",
+            "example": "pion"
+         },
+         "start_field": {
+            "content": "$2",
+            "example": "e 2"
+         }
+      }
+   },
+   "colorCheck": {
+      "description": "Label for color selection of the square where the king is in check",
+      "message": "Kolor dla pola z królem w szachu"
+   },
+   "colorSquareNotMatching": {
+      "description": "Label for color selection of squares on the eboard that differ from the position on the screen",
+      "message": "Kolor pól niezgodnych z pozycją na ekranie"
+   },
+   "colorSquareStart": {
+      "description": "Label for color selection of the start square of a move",
+      "message": "Kolor dla pola początkowego ruchu"
+   },
+   "colorSquareTarget": {
+      "description": "Label for color selection of the target square of a move",
+      "message": "Kolor dla pola docelowego ruchu"
+   },
+   "confirmBoardOk": {
+      "description": "play sound when opponent move was performed correctly",
+      "message": "Odtwórz dźwięk, gdy ruch przeciwnika został wykonany prawidłowo"
+   },
+   "confirmMoveHomePosition": {
+      "description": "Confirmation dialog for moving the pieces to their starting position",
+      "message": "Przenieść figury szachowe do pozycji startowej?"
+   },
+   "connectDGT3000Gateway": {
+      "description": "Label for the button to connect to the DGT 3000 Gateway",
+      "message": "Podłącz DGT 3000 Gateway"
+   },
+   "connectTapNset": {
+      "description": "Label for the button to connect to the TapNset adapter",
+      "message": "Podłącz zestaw TapNset"
+   },
+   "connectToChessboard": {
+      "description": "Label for the button to connect to a chessboard",
+      "message": "Połącz szachownicę"
+   },
+   "connectedBoardNotEnabled": {
+      "description": "Message displayed when the connected board API needs to be enabled",
+      "message": "Chessconnect musi raz przejść na stronę aktywacji API chess.com. Następnie możesz wrócić na tę stronę. Czy chcesz to zrobić teraz?"
+   },
+   "discordServer": {
+      "description": "Label for the link to the Chessconnect Discord server",
+      "message": "Jeśli masz problemy lub dobre pomysły dotyczące Chessconnect, napisz do mnie o tym na "
+   },
+   "dontShowAgain": {
+      "description": "Label for the checkbox to not show a message again",
+      "message": "Nie pokazuj ponownie"
+   },
+   "draw": {
+      "description": "announcement when a game is drawn",
+      "message": "remis"
+   },
+   "drawOffered": {
+      "description": "Notification that the opponent has offered a draw",
+      "message": "Przeciwnik zaproponował remis."
+   },
+   "enableApiToken": {
+      "description": "Label for the checkbox to enable the API token",
+      "message": "Użyj tokena API"
+   },
+   "extensionDescription": {
+      "message": "Podłącz swoją elektroniczną szachownicę do Chess.com, Lichess i innych! Darmowe, najlepsze rozszerzenie."
+   },
+   "extensionName": {
+      "message": "Chessconnect"
+   },
+   "king": {
+      "description": "chess piece",
+      "message": "król"
+   },
+   "knight": {
+      "description": "chess piece",
+      "message": "skoczek"
+   },
+   "languageCode": {
+      "description": "ISO2-Code of this language",
+      "message": "pl"
+   },
+   "ledBrightness": {
+      "description": "Label for the LED brightness slider",
+      "message": "Jasność LED"
+   },
+   "ledClockBrightness": {
+      "description": "Label for the brightness selection of the LED clock",
+      "message": "Jasność zegara LED"
+   },
+   "ledClockColor": {
+      "description": "Label for the color selection of the LED clock",
+      "message": "Kolor zegara LED"
+   },
+   "lichessWarning": {
+      "description": "Warning message for Lichess users about the limitations of the Lichess API support for different time controls",
+      "message": "Uwaga: Lichess oficjalnie obsługuje tylko kontrolę czasu Rapid, Classical i Correspondence (plus Blitz dla wyzwań, AI i masowego parowania). Inne formaty nie są oficjalnie obsługiwane i mogą wiązać się z niewielkim ryzykiem fałszywego oznaczenia jako oszustwo."
+   },
+   "longCastle": {
+      "description": "chess move",
+      "message": "długa roszada"
+   },
+   "mate": {
+      "description": "the king is check mated",
+      "message": "mat"
+   },
+   "moreOptions": {
+      "description": "Button to show more options in the options dialog",
+      "message": "Wszystkie opcje.."
+   },
+   "moveHomePosition": {
+      "description": "Label for the button to move the pieces to their home position",
+      "message": "Pozycja startowa"
+   },
+   "pawn": {
+      "description": "chess piece",
+      "message": "pion"
+   },
+   "piece": {
+      "description": "a chess piece",
+      "message": "figura"
+   },
+   "pressClockToTransmitMoves": {
+      "description": "Label for the checkbox to enable transmitting moves on clock press",
+      "message": "Naciśnij zegar, aby przesłać ruchy"
+   },
+   "queen": {
+      "description": "chess piece",
+      "message": "hetman"
+   },
+   "readChatMessages": {
+      "description": "Label for the checkbox to enable reading chat messages from chess.com",
+      "message": "Wyjście głosowe dla wiadomości czatu"
+   },
+   "reversePositionWhenBlack": {
+      "description": "Label for the checkbox to reverse the position of pieces when playing black on Chessnut Move",
+      "message": "W przypadku ruchu szachowego: Umieść czarne figury na rzędach 1 i 2, jeśli gracz ma czarne"
+   },
+   "rook": {
+      "description": "chess piece",
+      "message": "wieża"
+   },
+   "searching": {
+      "description": "message that Chessconnect is searching for a connected chess board",
+      "message": "szukanie.."
+   },
+   "shortCastle": {
+      "description": "chess move",
+      "message": "krótka roszada"
+   },
+   "showLedClock": {
+      "description": "Label for the checkbox to use the board LEDs to display the remaining time",
+      "message": "Użyj diod LED planszy do wyświetlania pozostałego czasu"
+   },
+   "showMovesOnClock": {
+      "description": "Label for the checkbox to enable showing moves on the clock display",
+      "message": "Pokaż ruchy na zegarze szachowym"
+   },
+   "start_new_game": {
+      "description": "Komunikat potwierdzający, gdy użytkownik chce rozpocząć nową grę",
+      "message": "Chessconnect wykrył nową grę. Czy chcesz rozpocząć nową grę na szachownicy?"
+   },
+   "useAppToOfferDraw": {
+      "description": "Notification to use the app to offer a draw",
+      "message": "Proszę użyć aplikacji, aby zaoferować remis."
+   },
+   "useAppToResign": {
+      "description": "Notification to use the app to resign the game",
+      "message": "Proszę użyć aplikacji, aby się poddać."
+   },
+   "useAppToUndoLastMove": {
+      "description": "Notification to use the app to undo the last move",
+      "message": "Proszę użyć aplikacji, aby cofnąć ostatni ruch."
+   },
+   "useTapnSetClock": {
+      "description": "Label for the checkbox to enable the Tap'n'Set clock feature",
+      "message": "Korzystanie z \u003Ca href=\"https://chessconnect.de/#tapnset\">adaptera Chessconnect TapNset-Pro\u003C/a>"
+   },
+   "voice_sample": {
+      "description": "Smaple text spoken by a newly selected voice",
+      "message": "Tak brzmi ten głos."
+   },
+   "waitingForClock": {
+      "description": "Message displayed when the clock is not yet synchronized",
+      "message": "Oczekiwanie na synchronizację zegara..."
+   }
+}
