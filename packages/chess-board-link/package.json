@@ -1,0 +1,48 @@
+{
+  "name": "chess-board-link",
+  "version": "0.2.0",
+  "description": "Connect physical chess boards (Chessnut, DGT, ChessUp) to a web app over Web Bluetooth / Web Serial, with lichess + chess.com integration. Reverse-engineered, ChessConnect-style.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "chess",
+    "chessboard",
+    "bluetooth",
+    "web-bluetooth",
+    "web-serial",
+    "chessnut",
+    "dgt",
+    "chessup",
+    "lichess"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "chess.js": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/w3c-web-serial": "^1.0.6",
+    "@types/web-bluetooth": "^0.0.20",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
