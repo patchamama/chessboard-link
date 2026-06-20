@@ -1,53 +1,118 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  createDefaultRegistry,
-  emptyBoard,
-  startingBoard,
-  fenToBoard,
+  clearLeds,
+  highlightMove,
+  WebBluetoothTransport,
   type BoardAdapter,
-  type BoardState,
   type ConnectionStatus,
   type DetectedMove,
-  MockAdapter,
 } from 'chess-board-link';
-import { Board } from './Board.js';
+import { ChessBoard } from './components/ChessBoard.js';
+import { EvalBar } from './components/EvalBar.js';
+import { FenPanel } from './components/FenPanel.js';
+import { BoardTabs } from './components/BoardTabs.js';
+import { PhysicalControls } from './components/PhysicalControls.js';
+import { EventLog, type LogEntry } from './components/EventLog.js';
+import { useChessGame } from './game/useChessGame.js';
+import { useStockfish } from './game/useStockfish.js';
+import { useBoardSessions } from './boards/useBoardSessions.js';
+import { START_FEN } from './boards/boardStorage.js';
 import { APP_VERSION } from './version.js';
 
-interface LogEntry {
-  ts: string;
-  text: string;
-}
-
 export function App() {
-  const registry = useMemo(() => createDefaultRegistry(), []);
-  const [boardId, setBoardId] = useState('chessnut');
+  const sessionsApi = useBoardSessions();
+  const { registry, sessions, activeId, setActiveId, ensureSession, updateSession, updateConfig, getAdapter, removeSession } = sessionsApi;
+
+  const active = sessions[activeId];
+  const game = useChessGame(active?.fen ?? START_FEN);
+  const sf = useStockfish();
+
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
-  const [state, setState] = useState<BoardState>(emptyBoard());
+  const [knownDevices, setKnownDevices] = useState<string[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
   const adapterRef = useRef<BoardAdapter | null>(null);
 
-  const append = (text: string) =>
+  const append = useCallback((text: string) => {
     setLog((l) => [{ ts: new Date().toLocaleTimeString(), text }, ...l].slice(0, 100));
+  }, []);
 
-  const reg = registry.get(boardId);
+  // Make sure the active board has a session.
+  useEffect(() => {
+    if (!sessions[activeId]) ensureSession(activeId);
+  }, [activeId, sessions, ensureSession]);
 
-  async function connect() {
-    if (adapterRef.current) await adapterRef.current.disconnect().catch(() => {});
-    const adapter = registry.create(boardId);
-    adapterRef.current = adapter;
+  // List paired BLE devices (for one-click reconnect after refresh).
+  useEffect(() => {
+    WebBluetoothTransport.getKnownDevices()
+      .then((d) => setKnownDevices(d.map((x) => x.id)))
+      .catch(() => {});
+  }, []);
 
+  // When switching tabs, load that board's saved position into the game.
+  useEffect(() => {
+    if (active?.fen) game.loadFen(active.fen);
+    adapterRef.current = getAdapter(activeId);
+    setStatus(adapterRef.current.status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  // Analyse the current position whenever it changes and the engine is ready.
+  useEffect(() => {
+    if (sf.ready) sf.analyse(game.fen, 14);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.fen, sf.ready]);
+
+  // Persist the active board's game on every move.
+  useEffect(() => {
+    updateSession(activeId, { fen: game.fen, pgn: game.pgn });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.fen]);
+
+  // Bot: when it's the bot's turn, ask Stockfish and apply its move.
+  useEffect(() => {
+    const cfg = active?.config;
+    if (!cfg?.botEnabled || game.result !== 'in_progress') return;
+    const botColor = cfg.botPlaysWhite ? 'w' : 'b';
+    if (game.turn !== botColor) return;
+    let cancelled = false;
+    sf.bestMove(game.fen, { skill: cfg.botSkill, movetime: 800 }).then((uci) => {
+      if (!cancelled && uci) {
+        const m = game.move(uci);
+        if (m) {
+          append(`bot: ${m.san}`);
+          void highlightOnPhysical(uci);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.fen, active?.config]);
+
+  function wireAdapter(adapter: BoardAdapter) {
     adapter.on('status', (s) => {
       setStatus(s);
-      append(`status: ${s}`);
+      append(`[${adapter.id}] status: ${s}`);
+      if (s === 'connected' && adapter.deviceId) {
+        updateSession(adapter.id, { deviceId: adapter.deviceId, deviceName: adapter.deviceName });
+      }
     });
-    adapter.on('boardState', (b) => setState([...b]));
-    adapter.on('move', (m: DetectedMove) =>
-      append(`move: ${m.uci}${m.san ? ` (${m.san})` : ''}`),
-    );
-    adapter.on('error', (e) => append(`error: ${e.message}`));
+    adapter.on('move', (m: DetectedMove) => {
+      // A move made on the physical board — apply it to the game if legal.
+      const applied = game.move(m.uci);
+      append(`[${adapter.id}] board move: ${m.uci}${applied ? ` (${applied.san})` : ' (ignored)'}`);
+    });
+    adapter.on('error', (e) => append(`[${adapter.id}] error: ${e.message}`));
+  }
 
+  async function connect(useKnownDevice: boolean) {
+    const adapter = getAdapter(activeId);
+    adapterRef.current = adapter;
+    wireAdapter(adapter);
     try {
-      await adapter.connect();
+      const deviceId = useKnownDevice ? active?.deviceId : undefined;
+      await adapter.connect(deviceId ? { deviceId } : undefined);
     } catch (e) {
       append(`connect failed: ${(e as Error).message}`);
     }
@@ -55,24 +120,27 @@ export function App() {
 
   async function disconnect() {
     await adapterRef.current?.disconnect().catch(() => {});
-    adapterRef.current = null;
   }
 
-  /** Drive the Mock adapter through a short opening so the UI can be tested. */
-  function runMockDemo() {
+  async function highlightOnPhysical(uci: string) {
     const adapter = adapterRef.current;
-    if (!(adapter instanceof MockAdapter)) {
-      append('select the Mock board and connect first');
-      return;
+    if (adapter?.status === 'connected' && adapter.setLeds) {
+      await highlightMove(adapter, uci).catch((e) => append(`led: ${(e as Error).message}`));
     }
-    const seq = [
-      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR', // e4
-      'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR', // e5
-      'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R', // Nf3
-    ].map(fenToBoard);
-    adapter.playback(seq, 900);
-    append('mock demo: 1.e4 e5 2.Nf3');
   }
+
+  // User moves on the on-screen board: validated by chess.js, then mirrored to
+  // the physical board by lighting the move's squares.
+  function onUserMove(uci: string) {
+    const m = game.move(uci);
+    if (!m) return;
+    append(`you: ${m.san}`);
+    void highlightOnPhysical(uci);
+  }
+
+  const reg = registry.get(activeId);
+  const supportsLeds = !!adapterRef.current?.setLeds;
+  const cfg = active?.config;
 
   return (
     <div className="app">
@@ -81,44 +149,104 @@ export function App() {
         <span className="version">v{APP_VERSION}</span>
       </header>
 
+      <BoardTabs
+        boards={registry.list()}
+        sessions={sessions}
+        activeId={activeId}
+        onSelect={setActiveId}
+        onAdd={(id) => {
+          ensureSession(id);
+          setActiveId(id);
+        }}
+        onRemove={(id) => void removeSession(id)}
+      />
+
+      <PhysicalControls
+        status={status}
+        transportType={reg?.transportType ?? 'bluetooth'}
+        hasKnownDevice={!!active?.deviceId && knownDevices.includes(active.deviceId)}
+        supportsLeds={supportsLeds}
+        canHighlight={!!game.lastMove}
+        onConnect={() => void connect(false)}
+        onReconnect={() => void connect(true)}
+        onDisconnect={() => void disconnect()}
+        onHighlightLast={() => game.lastMove && void highlightOnPhysical(game.lastMove.uci)}
+        onClearLeds={() => adapterRef.current && void clearLeds(adapterRef.current)}
+        onSyncFromPhysical={() => {
+          game.reset();
+          updateSession(activeId, { fen: START_FEN, pgn: '' });
+          append('synced: reset to starting position');
+        }}
+        onShowPhysicalState={() => {
+          const a = adapterRef.current;
+          if (a) append(`physical state has ${a.getState().filter(Boolean).length} pieces`);
+        }}
+      />
+
       <section className="controls">
         <label>
-          Board:&nbsp;
-          <select value={boardId} onChange={(e) => setBoardId(e.target.value)}>
-            {registry.list().map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({b.transportType}){b.experimental ? ' · experimental' : ''}
-              </option>
-            ))}
+          <input
+            type="checkbox"
+            checked={cfg?.flipped ?? false}
+            onChange={(e) => updateConfig(activeId, { flipped: e.target.checked })}
+          />
+          Flip
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={cfg?.botEnabled ?? false}
+            onChange={(e) => updateConfig(activeId, { botEnabled: e.target.checked })}
+          />
+          Bot {sf.ready ? '' : '(loading…)'}
+        </label>
+        <label>
+          Bot plays&nbsp;
+          <select
+            value={cfg?.botPlaysWhite ? 'w' : 'b'}
+            onChange={(e) => updateConfig(activeId, { botPlaysWhite: e.target.value === 'w' })}
+          >
+            <option value="b">Black</option>
+            <option value="w">White</option>
           </select>
         </label>
-        <button onClick={connect}>
-          Connect {reg?.transportType === 'serial' ? '(USB)' : '(Bluetooth)'}
+        <label>
+          Skill&nbsp;
+          <input
+            type="range"
+            min={0}
+            max={20}
+            value={cfg?.botSkill ?? 5}
+            onChange={(e) => updateConfig(activeId, { botSkill: Number(e.target.value) })}
+          />
+          {cfg?.botSkill ?? 5}
+        </label>
+        <button type="button" onClick={() => { game.reset(); updateSession(activeId, { fen: START_FEN, pgn: '' }); }}>
+          New game
         </button>
-        <button onClick={disconnect}>Disconnect</button>
-        {boardId === 'mock' && <button onClick={runMockDemo}>Run demo</button>}
-        <button onClick={() => setState(startingBoard())}>Show start pos</button>
-        <span className={`status status-${status}`}>{status}</span>
+        <button type="button" onClick={() => game.undo()}>Undo</button>
       </section>
 
       <div className="layout">
-        <Board state={state} />
-        <aside className="log">
-          <h3>Event log</h3>
-          <ul>
-            {log.map((e, i) => (
-              <li key={i}>
-                <span className="ts">{e.ts}</span> {e.text}
-              </li>
-            ))}
-          </ul>
-        </aside>
+        <EvalBar evaluation={sf.evaluation} sideToMove={game.turn} />
+        <ChessBoard
+          fen={game.fen}
+          legalTargets={game.legalTargets}
+          onMove={onUserMove}
+          lastMove={game.lastMove}
+          flipped={cfg?.flipped}
+        />
+        <div className="side">
+          <FenPanel fen={game.fen} turn={game.turn} result={game.result} evaluation={sf.evaluation} />
+          <EventLog log={log} />
+        </div>
       </div>
 
       <footer className="note">
-        Web Bluetooth / Web Serial require a Chromium browser over https or
-        localhost. Chessnut (BLE) and DGT (USB) use real reverse-engineered
-        protocols; ChessUp is an experimental stub; Mock needs no hardware.
+        Web Bluetooth / Web Serial need a Chromium browser over https or localhost.
+        Moving on screen lights the move on the physical board (boards with LEDs).
+        Physical moves are applied to the game when legal. Sessions persist across
+        refreshes; click Reconnect to re-link a paired board.
       </footer>
     </div>
   );

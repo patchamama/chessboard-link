@@ -13,6 +13,9 @@ importers:
       chess-board-link:
         specifier: workspace:*
         version: link:../../packages/chess-board-link
+      chess.js:
+        specifier: ^1.0.0
+        version: 1.4.0
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -35,6 +38,9 @@ importers:
       vite:
         specifier: ^6.0.5
         version: 6.4.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9
 
   packages/chess-board-link:
     dependencies:

@@ -1,7 +1,7 @@
 import { Chess } from 'chess.js';
-import { BaseBoardAdapter } from '../../core/BoardAdapter.js';
+import { BaseBoardAdapter, type ConnectOptions } from '../../core/BoardAdapter.js';
 import { fenToBoard, startingBoard } from '../../core/boardState.js';
-import type { DetectedMove, TransportType } from '../../core/types.js';
+import type { DetectedMove, LedState, TransportType } from '../../core/types.js';
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
   CHESSUP_ACK,
@@ -40,10 +40,21 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     this.transport.setDisconnectHandler(() => this.setStatus('disconnected'));
   }
 
-  async connect(): Promise<void> {
+  get deviceId(): string | undefined {
+    return this.transport.deviceId;
+  }
+
+  get deviceName(): string | undefined {
+    return this.transport.deviceName;
+  }
+
+  async connect(opts: ConnectOptions = {}): Promise<void> {
     this.setStatus('connecting');
     try {
-      await this.transport.connect();
+      const device = opts.deviceId
+        ? await WebBluetoothTransport.findKnownDevice(opts.deviceId)
+        : undefined;
+      await this.transport.connect({ device });
       this.game.reset();
       this._state = startingBoard();
       this.setStatus('connected');
@@ -57,6 +68,23 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   async disconnect(): Promise<void> {
     await this.transport.disconnect();
     this.setStatus('disconnected');
+  }
+
+  /**
+   * ChessUp's LED command is not yet reverse-engineered byte-for-byte. The
+   * board's UART output applies a per-byte parity bit and the LED payload is
+   * RGB; sending a guessed format could mis-drive the hardware. Until the
+   * command is captured from a physical board, this records the intent and
+   * warns instead of writing bytes. (Chessnut's `setLeds` is fully implemented.)
+   */
+  async setLeds(leds: LedState[]): Promise<void> {
+    const lit = leds.filter((l) => l.on).map((l) => l.square);
+    this.reportError(
+      new Error(
+        `ChessUp setLeds not yet implemented (would light: ${lit.join(', ') || 'none'}). ` +
+          `Its LED command needs capturing from hardware.`,
+      ),
+    );
   }
 
   private handleData(view: DataView): void {
