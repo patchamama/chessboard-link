@@ -18,35 +18,29 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
 
 - Service `6e400001-b5a3-f393-e0a9-e50e24dcca9e`, write `6e400002-…`, notify `6e400003-…`, plus battery service.
 - Device filter: `namePrefix: "ChessUp"`.
-- **Message framing** (corrected against a real board's traffic; the earlier
-  "`[163,…]` move frame" idea was wrong):
-  - *Outgoing* (`St`/`encodeMessage`): `[command]` for a bare command, or
-    `[command, size, …data, 0]` with `size = data.length + 1` and a `0`
-    terminator. Then parity-encoded (see below). Commands seen: `64` reset,
-    `66` request board dump, `96` config, `99` send-move-to-board (light it).
-  - *Incoming* (`processDataFromBoard`): a byte with **bit 7 set** starts a
-    message (the byte itself, bit 7 included, is the command id — the switch
-    matches `163`/`134` which have bit 7 set); the next one/two 7-bit bytes are
-    the size; remaining bytes are data. Incoming bytes are **not** parity-encoded.
-- **Connect handshake (critical):** the board only reports moves to an external
-  app after this exact sequence (from the beautified `initializeBoard`):
-  1. `St(71)` TRADEMARK — an auth challenge; **wait for the board's reply
-     (command `146`)** before continuing.
-  2. `St(96,[2,1,0])`, `St(96,[2,2,0])` — CONFIG ("app interaction" mode).
-  3. `St(68)`, `St(75)`, `St(66)` dump.
-  **Do NOT send `St(64)` reset** — it puts the board into firmware-update mode
-  ("update ready, plug in the charging cable"). (An earlier guess included a
-  reset and broke exactly this way.)
-- **Move via command `163`** (`onMoveFromBoard`, the clean path): message data is
-  `[53, fromRow, fromCol, toRow, toCol, …]` (row 0..7 = rank 1..8, col 0..7 =
-  a..h); castling reported king→rook, normalised to UCI king-target. Host ACKs
-  with `[33]` (parity-encoded). The host may poll for a move by sending `[33]`.
-- **Position = occupancy via command `134`** (`parsePosition`, fallback): the
-  data holds **five numbers per square** (an RFID tag); a square is occupied when
-  any of the five is non-zero. Square index `8*(7-s)+a`. Identifying the actual
-  piece needs the board's *learned* RFID→piece table (per piece set), so without
-  it you get occupancy only — enough to infer moves with chess.js.
-  Command `142` = board asks the host for a dump; `160` battery; `141` clock.
+> **Note:** verified against ChessConnect **v5.9.1** (what shipping boards run),
+> which is simpler than v6.0.3. There is **no** bit-7 framing or message-size
+> bytes: the first byte is the opcode directly.
+
+- **Messages:** outgoing is `[opcode, …data]` (then parity-encoded for BLE, see
+  below); inbound is `[opcode, …data]` and is **not** parity-encoded. The opcode
+  is the raw first byte (e.g. `163`).
+- **Connect handshake** (`startGame`), in order:
+  1. `RESET` `[100]` (0x64).
+  2. `SEND_FEN` `[102, len, …fenBytes]` (0x66) — FEN as ASCII (first 4 fields
+     joined by spaces) + halfmove + fullmove hi/lo. Board replies opcode `177`.
+  3. `GAME_SETTINGS` `[185, 2,0,1,1,0,1,1,0, …]` (0xB9) — app-vs-board settings.
+     Board replies opcode `36`.
+  (An earlier 6.0.3-based guess used different/extra bytes and dropped the board
+  into firmware-update mode, "update ready, plug in the charging cable".)
+- **Move (inbound, opcode `163`):** `[163, 53, fromCol, fromRow, toCol, toRow]`
+  — the extension reads `from = W(e[3], e[2])`, `to = W(e[5], e[4])` with
+  `W(row, col)`, so fromRow=`e[3]`, fromCol=`e[2]`, toRow=`e[5]`, toCol=`e[4]`
+  (row 0..7 = rank 1..8, col 0..7 = a..h). Castling reported king→rook,
+  normalised to UCI king-target. Host ACKs with `[33]` (parity-encoded).
+- **Send move to board (LEDs/hint), opcode `153`:** `[153, fromIndex, toIndex]`
+  where index = `row*8 + col` (`fieldToIndex`).
+- Other inbound opcodes: `151` promotion, `184` piece-touched, `38` error.
 - **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
   `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:
   `this.connectionType===BLUETOOTH&&(e=Ut.computeXParity(e))` before each write.
@@ -55,12 +49,13 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
   Sent via `sendLedStateToBoard` → `sendDataToBoard` (so it is parity-encoded
   like everything else). ChessUp 2 (`encodeLedState9x9rgb`) sends a 247-byte RGB
   frame `[255,85] + 243×RGB + [13,10]` — not ported.
-- Source: `const cs="ChessUp",ls="6e400001-…",ds="6e400002-…",hs="6e400003-…"`,
-  `encodeMessage(e){…[e.command, size, …data, 0]…}`, the incoming parser
-  `processDataFromBoard(e){for(const t of e){if(128&t)…}}`, the command switch
-  `case 134: parsePosition(e)` / `case 142: sendMessageToBoard(new St(66))`,
-  `parsePosition` (5 numbers per square, index `8*(7-s)+a`), and
-  `encodeLedState(e){…t[7-s]|=1<<i…}`.
+- Source (v5.9.1 beautified): `startGame()` →
+  `sendDataToBoard(Uint8Array.from([100]))`,
+  `sendDataToBoard(new Uint8Array([102, i.length, ...i]))` (FEN, wait `e[0]===177`),
+  `sendGameSettings()` = `[185, 2,0,1,1,0,1,1,0, …]` (wait `e[0]===36`);
+  `onMoveFromBoard` reads `W(e[3],e[2])`/`W(e[5],e[4])`;
+  `sendMoveToBoard` = `[153, fieldToIndex(from), fieldToIndex(to)]`;
+  `fieldToIndex(e){return e.row*8+e.col}`.
 
 ## ✅ Chessnut Air / Pro (BLE)
 

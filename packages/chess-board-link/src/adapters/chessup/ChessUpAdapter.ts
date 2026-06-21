@@ -1,42 +1,41 @@
 import { Chess } from 'chess.js';
 import { BaseBoardAdapter, type ConnectOptions } from '../../core/BoardAdapter.js';
-import { fenToBoard, startingBoard } from '../../core/boardState.js';
+import { boardToFen, fenToBoard, startingBoard } from '../../core/boardState.js';
 import type { DetectedMove, LedState, TransportType } from '../../core/types.js';
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
   applyParity,
   CHESSUP_ACK,
-  ChessUpMessageReader,
-  ChessUpOpcode,
-  CHESSUP_HANDSHAKE_AFTER_TRADEMARK,
-  CHESSUP_IN_POSITION,
-  CHESSUP_IN_REQUEST,
-  CHESSUP_IN_TRADEMARK,
+  CHESSUP_GAME_SETTINGS,
   CHESSUP_NAME_PREFIX,
   CHESSUP_NOTIFY_UUID,
   CHESSUP_SERVICE_UUID,
   CHESSUP_WRITE_UUID,
   ChessUpCommand,
-  decodeChessUpOccupancy,
+  ChessUpInbound,
+  encodeChessUpFen,
   encodeChessUpLeds,
-  encodeChessUpMessage,
-  parseChessUpMoveFromData,
+  parseChessUpMove,
 } from './protocol.js';
+
+const FULL_START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 /**
  * Adapter for ChessUp boards over Web Bluetooth (Nordic UART).
  *
- * Protocol reverse-engineered from the official ChessConnect extension and
- * confirmed against a real board's traffic. ChessUp frames messages with a
- * bit-7 start marker + size bytes; the host's writes are parity-encoded. The
- * board reports **occupancy** (an RFID tag per square — five numbers, non-zero
- * = occupied); identifying the actual piece needs the board's learned RFID
- * table, so this adapter tracks occupancy and infers moves from the starting
- * position with chess.js (like Chessnut/DGT), which is enough to play.
+ * Protocol verified against ChessConnect **v5.9.1** (what shipping boards run).
+ * Messages are NOT bit-7 framed: the first byte is the opcode directly. Outgoing
+ * BLE bytes are parity-encoded; incoming bytes are not.
  *
- * Connect flow: reset (64), request a dump (66); the board streams POSITION
- * messages (command 134). When the board asks for a dump (command 142) we
- * answer with another request.
+ * Connect (the extension's `startGame`):
+ *   1. RESET `[100]`
+ *   2. SEND_FEN `[102, len, …fenBytes]` — board replies opcode 177
+ *   3. GAME_SETTINGS `[185, 2,0,1,1,0,1,1,0, …]` — board replies opcode 36
+ *
+ * The board then reports completed moves as `[163, 53, fromRow, fromCol, toRow,
+ * toCol]`; the host ACKs with `[33]`. (No reset variant other than 100; an
+ * earlier 6.0.3-based guess used different bytes and put the board into
+ * firmware-update mode.)
  */
 export class ChessUpAdapter extends BaseBoardAdapter {
   readonly id = 'chessup';
@@ -49,12 +48,7 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     writeCharacteristicUuid: CHESSUP_WRITE_UUID,
     namePrefixes: [CHESSUP_NAME_PREFIX],
   });
-  private readonly reader = new ChessUpMessageReader();
   private readonly game = new Chess();
-  /** Occupancy we last applied, to ignore duplicate/transient snapshots. */
-  private lastOccupancy: boolean[] | null = null;
-  /** Resolves when the board answers the TRADEMARK (71) challenge with 146. */
-  private trademarkResolver: (() => void) | null = null;
 
   constructor() {
     super();
@@ -79,15 +73,12 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       await this.transport.connect({ device });
       this.game.reset();
       this._state = startingBoard();
-      this.lastOccupancy = occupancyOf(this._state);
-      // Handshake (from the extension's initializeBoard): first the TRADEMARK
-      // (71) auth challenge — wait for the board's reply (146) — then the CONFIG
-      // messages that enable "app interaction" mode, then a dump request. There
-      // is NO reset(64): sending one drops the board into firmware-update mode.
-      await this.doTrademark();
-      for (const [command, ...rest] of CHESSUP_HANDSHAKE_AFTER_TRADEMARK) {
-        await this.send(command!, rest.length ? rest : undefined);
-      }
+
+      // Handshake (startGame): reset, send the starting FEN, then game settings.
+      await this.send(ChessUpCommand.RESET);
+      await this.send(ChessUpCommand.SEND_FEN, encodeChessUpFen(FULL_START_FEN));
+      await this.send(ChessUpCommand.GAME_SETTINGS, CHESSUP_GAME_SETTINGS);
+
       this.setStatus('connected');
       this.emit('boardState', this._state);
     } catch (error) {
@@ -97,41 +88,25 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   }
 
   async disconnect(): Promise<void> {
-    this.trademarkResolver = null;
     await this.transport.disconnect();
     this.setStatus('disconnected');
   }
 
   /**
-   * Send the TRADEMARK (71) challenge and resolve once the board answers with
-   * command 146. Times out after 3s so a non-responding board doesn't hang the
-   * connect (we then proceed with the rest of the handshake best-effort).
-   */
-  private async doTrademark(): Promise<void> {
-    const waitReply = new Promise<void>((resolve) => {
-      this.trademarkResolver = resolve;
-      setTimeout(() => {
-        if (this.trademarkResolver) {
-          this.trademarkResolver = null;
-          resolve();
-        }
-      }, 3000);
-    });
-    await this.send(ChessUpCommand.TRADEMARK);
-    await waitReply;
-  }
-
-  /**
-   * Light squares on the board (8-byte LED bitmap, `encodeLedStateSimple`).
-   * Parity-encoded like every ChessUp BLE write. Targets non-RGB ChessUp 1.
+   * Light squares on the board (8-byte LED bitmap, `encodeLedStateSimple`),
+   * parity-encoded like every ChessUp BLE write. Targets non-RGB ChessUp 1.
    */
   async setLeds(leds: LedState[]): Promise<void> {
     await this.write(encodeChessUpLeds(leds));
   }
 
-  /** Send a framed command (optionally with data). */
+  /** Send `[command, ...data]` (raw opcode, no framing). */
   private async send(command: number, data?: number[]): Promise<void> {
-    await this.write(encodeChessUpMessage(command, data));
+    const payload =
+      data && data.length
+        ? Uint8Array.from([command, ...data])
+        : Uint8Array.from([command]);
+    await this.write(payload);
   }
 
   /** Parity-encode a payload and write it; logs the pre-parity bytes. */
@@ -144,22 +119,18 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     const data = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
     this.reportIo('received', data);
     try {
-      for (const msg of this.reader.push(data)) {
-        if (msg.command === CHESSUP_IN_TRADEMARK) {
-          // Board answered the auth challenge — release the connect handshake.
-          this.trademarkResolver?.();
-          this.trademarkResolver = null;
-        } else if (msg.command === ChessUpOpcode.MOVE) {
-          // Clean path: the board reports the completed move directly.
-          this.handleMove(parseChessUpMoveFromData(msg.data));
+      switch (data[0]) {
+        case ChessUpInbound.MOVE:
+          this.handleMove(parseChessUpMove(data));
           void this.write(CHESSUP_ACK).catch(() => {}); // parity-encoded ACK
-        } else if (msg.command === CHESSUP_IN_POSITION) {
-          // Fallback: derive the move from an occupancy snapshot.
-          this.handlePosition(decodeChessUpOccupancy(msg.data));
-        } else if (msg.command === CHESSUP_IN_REQUEST) {
-          void this.send(ChessUpCommand.REQUEST_DUMP).catch(() => {});
-        }
-        // Battery (160) / clock (141) messages are ignored.
+          break;
+        case ChessUpInbound.ERROR:
+          this.reportError(new Error('ChessUp board reported an error (opcode 38)'));
+          break;
+        // FEN_OK (177), SETTINGS_OK (36), PROMOTION (151), PIECE_TOUCHED (184)
+        // are informational; the completed move arrives as opcode 163.
+        default:
+          break;
       }
     } catch (error) {
       this.reportError(error as Error);
@@ -167,8 +138,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   }
 
   /**
-   * Apply a move reported directly by the board (command 163). Validates it
-   * against the tracked game; emits boardState + move when legal.
+   * Apply a move reported by the board (opcode 163). Validates it against the
+   * tracked game; emits boardState + move when legal, raw otherwise.
    */
   private handleMove(move: DetectedMove | null): void {
     if (!move) return;
@@ -179,7 +150,6 @@ export class ChessUpAdapter extends BaseBoardAdapter {
         promotion: move.promotion ?? 'q',
       });
       this._state = fenToBoard(this.game.fen());
-      this.lastOccupancy = occupancyOf(this._state);
       this.emit('boardState', this._state);
       this.emit('move', {
         from: applied.from,
@@ -194,48 +164,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     }
   }
 
-  /**
-   * Apply a fresh occupancy snapshot: find the legal move whose resulting
-   * occupancy matches, play it, and emit boardState + move. Snapshots that
-   * don't correspond to a single completed legal move are ignored (e.g. a piece
-   * lifted mid-move), so we wait for the board to settle.
-   */
-  private handlePosition(occ: boolean[]): void {
-    if (this.lastOccupancy && sameOccupancy(occ, this.lastOccupancy)) return;
-
-    // Try to match the new occupancy to a legal move from the current position.
-    const moves = this.game.moves({ verbose: true });
-    for (const m of moves) {
-      const probe = new Chess(this.game.fen());
-      probe.move({ from: m.from, to: m.to, promotion: m.promotion ?? 'q' });
-      if (sameOccupancy(occ, occupancyOf(fenToBoard(probe.fen())))) {
-        const applied = this.game.move({ from: m.from, to: m.to, promotion: m.promotion ?? 'q' });
-        this.lastOccupancy = occ;
-        this._state = fenToBoard(this.game.fen());
-        this.emit('boardState', this._state);
-        const move: DetectedMove = {
-          from: applied.from,
-          to: applied.to,
-          promotion: applied.promotion as DetectedMove['promotion'],
-          uci: `${applied.from}${applied.to}${applied.promotion ?? ''}`,
-          san: applied.san,
-        };
-        this.emit('move', move);
-        return;
-      }
-    }
-    // No single legal move matches yet — remember occupancy but don't emit.
-    this.lastOccupancy = occ;
+  /** Current board as a FEN placement (used by tests/consumers). */
+  getFenPlacement(): string {
+    return boardToFen(this._state);
   }
-}
-
-/** Occupancy (true = piece present) of a board snapshot, a8..h1 order. */
-function occupancyOf(board: ReturnType<typeof startingBoard>): boolean[] {
-  return board.map((p) => p !== null);
-}
-
-function sameOccupancy(a: boolean[], b: boolean[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
 }
