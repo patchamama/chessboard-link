@@ -17,10 +17,11 @@ export const CHESSUP_NAME_PREFIX = 'ChessUp';
 
 /**
  * @deprecated Early (incorrect) assumption that ChessUp emits parity-free
- * `[163, …]` move frames. Real boards frame messages with a bit-7 start marker
- * and report **occupancy** under command {@link CHESSUP_IN_POSITION} (134); use
- * {@link ChessUpMessageReader} + {@link decodeChessUpOccupancy} instead. Kept
- * only so older imports/tests still resolve.
+ * Inbound message command ids (the low 7 bits of a bit-7 start byte, parsed by
+ * {@link ChessUpMessageReader}). The board sends a completed move under command
+ * {@link ChessUpOpcode.MOVE} (163), and a full occupancy snapshot under
+ * {@link CHESSUP_IN_POSITION} (134). The move command is the clean path; we use
+ * occupancy as a fallback.
  */
 export const ChessUpOpcode = {
   MOVE: 163,
@@ -29,7 +30,7 @@ export const ChessUpOpcode = {
   ERROR: 38,
 } as const;
 
-/** @deprecated See {@link ChessUpOpcode}. */
+/** ACK the host writes after receiving a move (parity-encoded by the adapter). */
 export const CHESSUP_ACK = new Uint8Array([33]);
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
@@ -129,14 +130,53 @@ export function encodeChessUpLeds(leds: LedState[]): Uint8Array {
 export const ChessUpCommand = {
   RESET: 64, // 0x40 — reset the board
   REQUEST_DUMP: 66, // 0x42 — ask the board to send its current position
-  CONFIG: 96, // 0x60 — configuration messages (St(96, [...]))
+  CONFIG: 96, // 0x60 — configuration (puts the board in "app interaction" mode)
+  CMD_68: 68, // 0x44 — part of the connect handshake
+  CMD_75: 75, // 0x4b — part of the connect handshake
   SEND_MOVE: 99, // 0x63 — tell the board a move (e.g. to light it)
 } as const;
 
-/** Command id of an inbound POSITION message. */
+/**
+ * The connect handshake the extension performs, in order, to make ChessUp
+ * report moves to an external app. Without the CONFIG messages the board stays
+ * idle (does not emit moves). Each entry is `[command, ...data]`.
+ */
+export const CHESSUP_HANDSHAKE: number[][] = [
+  [ChessUpCommand.RESET],
+  [ChessUpCommand.CONFIG, 2, 1, 0],
+  [ChessUpCommand.CONFIG, 2, 2, 0],
+  [ChessUpCommand.CMD_68],
+  [ChessUpCommand.CMD_75],
+  [ChessUpCommand.REQUEST_DUMP],
+];
+
+/** Command id of an inbound POSITION (occupancy) message. */
 export const CHESSUP_IN_POSITION = 134;
 /** Inbound: board asks the host for a dump. */
 export const CHESSUP_IN_REQUEST = 142;
+
+/**
+ * Parse a MOVE message's `data` (the bytes after command+size) into a UCI move.
+ * Layout: `[53, fromRow, fromCol, toRow, toCol, …]` — row 0..7 = rank 1..8,
+ * col 0..7 = a..h. Castling is reported king→rook and normalised to UCI
+ * king-target form. Returns null if the data isn't a move payload.
+ */
+export function parseChessUpMoveFromData(data: number[]): DetectedMove | null {
+  if (data.length < 5 || data[0] !== 53) return null;
+  const from = squareName(data[2]!, data[1]!);
+  let to = squareName(data[4]!, data[3]!);
+  const castle: Record<string, string> = {
+    e1h1: 'g1', e1a1: 'c1', e8h8: 'g8', e8a8: 'c8',
+  };
+  const target = castle[`${from}${to}`];
+  if (target) to = target;
+  return { from, to, uci: `${from}${to}` };
+}
+
+const MOVE_FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
+function squareName(col: number, row: number): string {
+  return `${MOVE_FILES[col] ?? '?'}${row + 1}`;
+}
 
 /** Build an outgoing message payload (pre-parity). */
 export function encodeChessUpMessage(command: number, data?: number[]): Uint8Array {
@@ -164,7 +204,9 @@ export class ChessUpMessageReader {
     for (const t of bytes) {
       if (t & 0x80) {
         // Start of a new message; command is the low 7 bits.
-        this.cur = { command: t & 0x7f, size: 0, data: [], needSecondSizeByte: false };
+        // The command keeps its high bit: the extension switches on values like
+        // 163 (0xA3) and 134 (0x86), which have bit 7 set as the start marker.
+        this.cur = { command: t, size: 0, data: [], needSecondSizeByte: false };
       } else if (this.cur) {
         if (this.cur.size === 0 && !this.cur.needSecondSizeByte && this.cur.data.length === 0) {
           // First size byte (high 7 bits).

@@ -5,17 +5,21 @@ import type { DetectedMove, LedState, TransportType } from '../../core/types.js'
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
   applyParity,
-  ChessUpCommand,
+  CHESSUP_ACK,
   ChessUpMessageReader,
+  ChessUpOpcode,
+  CHESSUP_HANDSHAKE,
   CHESSUP_IN_POSITION,
   CHESSUP_IN_REQUEST,
   CHESSUP_NAME_PREFIX,
   CHESSUP_NOTIFY_UUID,
   CHESSUP_SERVICE_UUID,
   CHESSUP_WRITE_UUID,
+  ChessUpCommand,
   decodeChessUpOccupancy,
   encodeChessUpLeds,
   encodeChessUpMessage,
+  parseChessUpMoveFromData,
 } from './protocol.js';
 
 /**
@@ -73,9 +77,12 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       this.game.reset();
       this._state = startingBoard();
       this.lastOccupancy = occupancyOf(this._state);
-      // Handshake: reset, then ask the board for its current position.
-      await this.send(ChessUpCommand.RESET);
-      await this.send(ChessUpCommand.REQUEST_DUMP);
+      // Full handshake: reset + CONFIG (puts the board in "app interaction"
+      // mode so it reports moves) + dump request. Without CONFIG the board
+      // stays idle and emits nothing.
+      for (const [command, ...rest] of CHESSUP_HANDSHAKE) {
+        await this.send(command!, rest.length ? rest : undefined);
+      }
       this.setStatus('connected');
       this.emit('boardState', this._state);
     } catch (error) {
@@ -113,7 +120,12 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     this.reportIo('received', data);
     try {
       for (const msg of this.reader.push(data)) {
-        if (msg.command === CHESSUP_IN_POSITION) {
+        if (msg.command === ChessUpOpcode.MOVE) {
+          // Clean path: the board reports the completed move directly.
+          this.handleMove(parseChessUpMoveFromData(msg.data));
+          void this.write(CHESSUP_ACK).catch(() => {}); // parity-encoded ACK
+        } else if (msg.command === CHESSUP_IN_POSITION) {
+          // Fallback: derive the move from an occupancy snapshot.
           this.handlePosition(decodeChessUpOccupancy(msg.data));
         } else if (msg.command === CHESSUP_IN_REQUEST) {
           void this.send(ChessUpCommand.REQUEST_DUMP).catch(() => {});
@@ -122,6 +134,34 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       }
     } catch (error) {
       this.reportError(error as Error);
+    }
+  }
+
+  /**
+   * Apply a move reported directly by the board (command 163). Validates it
+   * against the tracked game; emits boardState + move when legal.
+   */
+  private handleMove(move: DetectedMove | null): void {
+    if (!move) return;
+    try {
+      const applied = this.game.move({
+        from: move.from,
+        to: move.to,
+        promotion: move.promotion ?? 'q',
+      });
+      this._state = fenToBoard(this.game.fen());
+      this.lastOccupancy = occupancyOf(this._state);
+      this.emit('boardState', this._state);
+      this.emit('move', {
+        from: applied.from,
+        to: applied.to,
+        promotion: applied.promotion as DetectedMove['promotion'],
+        uci: `${applied.from}${applied.to}${applied.promotion ?? ''}`,
+        san: applied.san,
+      });
+    } catch {
+      // Board move didn't fit our tracked position (missed a frame); emit raw.
+      this.emit('move', move);
     }
   }
 

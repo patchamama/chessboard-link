@@ -25,13 +25,23 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
     terminator. Then parity-encoded (see below). Commands seen: `64` reset,
     `66` request board dump, `96` config, `99` send-move-to-board (light it).
   - *Incoming* (`processDataFromBoard`): a byte with **bit 7 set** starts a
-    message (low 7 bits = command); the next one/two 7-bit bytes are the size;
-    remaining bytes are data. Incoming bytes are **not** parity-encoded.
-- **Position = occupancy via command `134`** (`parsePosition`): the data holds
-  **five numbers per square** (an RFID tag); a square is occupied when any of the
-  five is non-zero. Square index `8*(7-s)+a`. Identifying the actual piece needs
-  the board's *learned* RFID→piece table (per piece set), so without it you get
-  occupancy only — enough to infer moves from the start position with chess.js.
+    message (the byte itself, bit 7 included, is the command id — the switch
+    matches `163`/`134` which have bit 7 set); the next one/two 7-bit bytes are
+    the size; remaining bytes are data. Incoming bytes are **not** parity-encoded.
+- **Connect handshake (critical):** the board only reports moves to an external
+  app after a CONFIG sequence. The extension sends, in order: `St(64)` reset,
+  `St(96,[2,1,0])`, `St(96,[2,2,0])`, `St(68)`, `St(75)`, `St(66)` dump. Without
+  the CONFIG messages the board stays idle (this was why an earlier version saw
+  nothing / "error opcode 38").
+- **Move via command `163`** (`onMoveFromBoard`, the clean path): message data is
+  `[53, fromRow, fromCol, toRow, toCol, …]` (row 0..7 = rank 1..8, col 0..7 =
+  a..h); castling reported king→rook, normalised to UCI king-target. Host ACKs
+  with `[33]` (parity-encoded). The host may poll for a move by sending `[33]`.
+- **Position = occupancy via command `134`** (`parsePosition`, fallback): the
+  data holds **five numbers per square** (an RFID tag); a square is occupied when
+  any of the five is non-zero. Square index `8*(7-s)+a`. Identifying the actual
+  piece needs the board's *learned* RFID→piece table (per piece set), so without
+  it you get occupancy only — enough to infer moves with chess.js.
   Command `142` = board asks the host for a dump; `160` battery; `141` clock.
 - **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
   `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:
