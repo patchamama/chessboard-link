@@ -1,6 +1,6 @@
 {
   "name": "chess-board-link",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Connect physical chess boards (Chessnut, DGT, ChessUp) to a web app over Web Bluetooth / Web Serial, with lichess + chess.com integration. Reverse-engineered, ChessConnect-style.",
   "type": "module",
   "license": "MIT",

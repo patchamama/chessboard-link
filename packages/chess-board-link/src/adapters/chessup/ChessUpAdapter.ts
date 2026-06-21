@@ -4,12 +4,14 @@ import { fenToBoard, startingBoard } from '../../core/boardState.js';
 import type { DetectedMove, LedState, TransportType } from '../../core/types.js';
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
+  applyParity,
   CHESSUP_ACK,
   CHESSUP_NAME_PREFIX,
   CHESSUP_NOTIFY_UUID,
   CHESSUP_SERVICE_UUID,
   CHESSUP_WRITE_UUID,
   ChessUpOpcode,
+  encodeChessUpLeds,
   parseChessUpMove,
 } from './protocol.js';
 
@@ -71,20 +73,20 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   }
 
   /**
-   * ChessUp's LED command is not yet reverse-engineered byte-for-byte. The
-   * board's UART output applies a per-byte parity bit and the LED payload is
-   * RGB; sending a guessed format could mis-drive the hardware. Until the
-   * command is captured from a physical board, this records the intent and
-   * warns instead of writing bytes. (Chessnut's `setLeds` is fully implemented.)
+   * Light squares on the board. Sends the 8-byte LED bitmap the extension uses
+   * (`encodeLedStateSimple`); like every ChessUp BLE write it is parity-encoded.
+   * Targets non-RGB ChessUp 1 boards. (ChessUp 2 uses a 247-byte RGB frame —
+   * not implemented here.)
    */
   async setLeds(leds: LedState[]): Promise<void> {
-    const lit = leds.filter((l) => l.on).map((l) => l.square);
-    this.reportError(
-      new Error(
-        `ChessUp setLeds not yet implemented (would light: ${lit.join(', ') || 'none'}). ` +
-          `Its LED command needs capturing from hardware.`,
-      ),
-    );
+    await this.writeWithParity(encodeChessUpLeds(leds));
+  }
+
+  /** Write a raw payload with ChessUp's BLE parity encoding applied. */
+  private async writeWithParity(payload: Uint8Array): Promise<void> {
+    const encoded = applyParity(payload);
+    this.reportIo('sent', payload);
+    await this.transport.write(encoded);
   }
 
   private handleData(view: DataView): void {
@@ -94,9 +96,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       switch (data[0]) {
         case ChessUpOpcode.MOVE:
           this.handleMove(parseChessUpMove(data));
-          // Acknowledge receipt, mirroring the extension.
-          this.reportIo('sent', CHESSUP_ACK);
-          void this.transport.write(CHESSUP_ACK).catch(() => {});
+          // Acknowledge receipt, mirroring the extension (parity-encoded).
+          void this.writeWithParity(CHESSUP_ACK).catch(() => {});
           break;
         case ChessUpOpcode.ERROR:
           this.reportError(new Error(`ChessUp board reported error (opcode 38)`));

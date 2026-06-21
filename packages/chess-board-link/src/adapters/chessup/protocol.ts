@@ -1,4 +1,5 @@
-import type { DetectedMove } from '../../core/types.js';
+import type { DetectedMove, LedState } from '../../core/types.js';
+import { squareToIndex } from '../../utils/squares.js';
 
 /**
  * ChessUp BLE protocol.
@@ -64,4 +65,45 @@ export function parseChessUpMove(data: Uint8Array): DetectedMove | null {
   if (target) to = target;
 
   return { from, to, uci: `${from}${to}` };
+}
+
+/**
+ * ChessUp BLE parity encoding. Every byte sent to the board over Bluetooth is
+ * passed through this (the extension's `computeXParity` / `addParityBit`):
+ * set bit 7, then for each of the low 7 bits that is set, flip bit 7. The
+ * result is an even-parity byte the board expects.
+ */
+export function addParityBit(byte: number): number {
+  let e = byte | 0x80;
+  for (let i = 0; i < 7; i++) {
+    if (e & (1 << i)) e ^= 0x80;
+  }
+  return e & 0xff;
+}
+
+/** Apply {@link addParityBit} to every byte of a buffer (returns a new array). */
+export function applyParity(bytes: Uint8Array): Uint8Array {
+  const out = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) out[i] = addParityBit(bytes[i]!);
+  return out;
+}
+
+/**
+ * Encode an LED state for a (non-RGB) ChessUp board: an 8-byte bitmap where
+ * byte `7 - rank` has bit `1 << file` set for each lit square (rank/file 0..7,
+ * white's first rank = 0). Mirrors the extension's `encodeLedStateSimple`.
+ *
+ * Note: the returned bytes are the raw payload; parity is applied by the
+ * adapter's writer (every ChessUp BLE write is parity-encoded).
+ */
+export function encodeChessUpLeds(leds: LedState[]): Uint8Array {
+  const out = new Uint8Array(8);
+  for (const { square, on } of leds) {
+    if (!on) continue;
+    const index = squareToIndex(square); // a8..h1 order
+    const rank = 7 - Math.floor(index / 8); // 0 = rank 1 (white side)
+    const file = index % 8; // 0 = a
+    out[7 - rank]! |= 1 << file;
+  }
+  return out;
 }

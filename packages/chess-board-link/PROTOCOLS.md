@@ -24,8 +24,17 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
     to king-target (e1g1).
   - `151` PROMOTION, `184` PIECE_TOUCHED, `38` ERROR.
 - After a move the host writes ACK `Uint8Array([33])`.
-- Source: `const cs="ChessUp",ls="6e400001-…",ds="6e400002-…",hs="6e400003-…"` and
-  `onMoveFromBoard(e){…W(e[3],e[2]),W(e[5],e[4])…sendDataToBoard(Uint8Array.from([33]))}`.
+- **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
+  `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:
+  `this.connectionType===BLUETOOTH&&(e=Ut.computeXParity(e))` before each write.
+- **LEDs** (non-RGB ChessUp 1, `encodeLedStateSimple`): an 8-byte bitmap where
+  byte `7-rank` has bit `1<<file` set per lit square (rank/file 0..7, white = 0).
+  Sent via `sendLedStateToBoard` → `sendDataToBoard` (so it is parity-encoded
+  like everything else). ChessUp 2 (`encodeLedState9x9rgb`) sends a 247-byte RGB
+  frame `[255,85] + 243×RGB + [13,10]` — not ported.
+- Source: `const cs="ChessUp",ls="6e400001-…",ds="6e400002-…",hs="6e400003-…"`,
+  `onMoveFromBoard(e){…W(e[3],e[2]),W(e[5],e[4])…sendDataToBoard(Uint8Array.from([33]))}`,
+  and `encodeLedState(e){…t[7-s]|=1<<i…}`.
 
 ## ✅ Chessnut Air / Pro (BLE)
 
