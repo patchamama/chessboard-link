@@ -29,10 +29,14 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
     matches `163`/`134` which have bit 7 set); the next one/two 7-bit bytes are
     the size; remaining bytes are data. Incoming bytes are **not** parity-encoded.
 - **Connect handshake (critical):** the board only reports moves to an external
-  app after a CONFIG sequence. The extension sends, in order: `St(64)` reset,
-  `St(96,[2,1,0])`, `St(96,[2,2,0])`, `St(68)`, `St(75)`, `St(66)` dump. Without
-  the CONFIG messages the board stays idle (this was why an earlier version saw
-  nothing / "error opcode 38").
+  app after this exact sequence (from the beautified `initializeBoard`):
+  1. `St(71)` TRADEMARK — an auth challenge; **wait for the board's reply
+     (command `146`)** before continuing.
+  2. `St(96,[2,1,0])`, `St(96,[2,2,0])` — CONFIG ("app interaction" mode).
+  3. `St(68)`, `St(75)`, `St(66)` dump.
+  **Do NOT send `St(64)` reset** — it puts the board into firmware-update mode
+  ("update ready, plug in the charging cable"). (An earlier guess included a
+  reset and broke exactly this way.)
 - **Move via command `163`** (`onMoveFromBoard`, the clean path): message data is
   `[53, fromRow, fromCol, toRow, toCol, …]` (row 0..7 = rank 1..8, col 0..7 =
   a..h); castling reported king→rook, normalised to UCI king-target. Host ACKs

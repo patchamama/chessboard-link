@@ -128,7 +128,7 @@ export function encodeChessUpLeds(leds: LedState[]): Uint8Array {
  * the data. Incoming bytes are NOT parity-encoded.
  */
 export const ChessUpCommand = {
-  RESET: 64, // 0x40 — reset the board
+  TRADEMARK: 71, // 0x47 — auth challenge; board replies with command 146
   REQUEST_DUMP: 66, // 0x42 — ask the board to send its current position
   CONFIG: 96, // 0x60 — configuration (puts the board in "app interaction" mode)
   CMD_68: 68, // 0x44 — part of the connect handshake
@@ -136,13 +136,20 @@ export const ChessUpCommand = {
   SEND_MOVE: 99, // 0x63 — tell the board a move (e.g. to light it)
 } as const;
 
+/** The board's reply command to the TRADEMARK (71) challenge. */
+export const CHESSUP_IN_TRADEMARK = 146;
+
 /**
- * The connect handshake the extension performs, in order, to make ChessUp
- * report moves to an external app. Without the CONFIG messages the board stays
- * idle (does not emit moves). Each entry is `[command, ...data]`.
+ * The connect handshake the extension performs (from the beautified
+ * `initializeBoard`), in order. The board only reports moves to an external app
+ * after this. **There is no reset (64)** — an earlier version sent one and it
+ * put the board into firmware-update mode ("plug in the charging cable").
+ *
+ * Step 1 (TRADEMARK) must wait for the board's reply (command 146) before the
+ * rest; see {@link ChessUpAdapter}. The remaining entries are sent in order.
+ * Each entry is `[command, ...data]`.
  */
-export const CHESSUP_HANDSHAKE: number[][] = [
-  [ChessUpCommand.RESET],
+export const CHESSUP_HANDSHAKE_AFTER_TRADEMARK: number[][] = [
   [ChessUpCommand.CONFIG, 2, 1, 0],
   [ChessUpCommand.CONFIG, 2, 2, 0],
   [ChessUpCommand.CMD_68],

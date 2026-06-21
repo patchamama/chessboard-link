@@ -1,7 +1,19 @@
 # Reference material
 
 Third-party material kept for reverse-engineering reference only. **Not part of
-the build** and not covered by this project's license.
+the build** and not covered by this project's license. All folders here are
+gitignored (proprietary); they are regenerated locally as needed.
+
+## Tooling used for reverse-engineering
+
+- **`chessconnect-beautified/`** — `background.js` run through `js-beautify`
+  (`npx js-beautify dist/background.js`) so the minified bundle is readable
+  (~7.8k lines). Generate with the command above against the extension copy.
+- **`chessconnect-instrumented/`** — a copy of the extension with its internal
+  logger patched to also `console.log` every message (`[CC-LOG]` lines), used to
+  capture the exact bytes a real ChessUp board exchanges. See its
+  `CAPTURE-GUIDE.md` for how to load it and capture. This is how the ChessUp
+  connect handshake (TRADEMARK 71 → CONFIG …, **no reset 64**) was confirmed.
 
 ## `chessconnect-extension/`
 

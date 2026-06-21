@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addParityBit,
-  CHESSUP_HANDSHAKE,
+  CHESSUP_HANDSHAKE_AFTER_TRADEMARK,
   ChessUpCommand,
   ChessUpMessageReader,
   ChessUpOpcode,
@@ -91,7 +91,7 @@ describe('ChessUp LED encoding', () => {
 
 describe('ChessUp message framing', () => {
   it('encodes a bare command as a single byte', () => {
-    expect(Array.from(encodeChessUpMessage(ChessUpCommand.RESET))).toEqual([64]);
+    expect(Array.from(encodeChessUpMessage(ChessUpCommand.TRADEMARK))).toEqual([71]);
   });
 
   it('encodes a command with data as [cmd, size, ...data, 0]', () => {
@@ -119,9 +119,13 @@ describe('ChessUp message framing', () => {
   });
 
   it('handshake includes the CONFIG (app-interaction) messages', () => {
-    const hasConfig = CHESSUP_HANDSHAKE.some((m) => m[0] === ChessUpCommand.CONFIG);
+    const hasConfig = CHESSUP_HANDSHAKE_AFTER_TRADEMARK.some(
+      (m) => m[0] === ChessUpCommand.CONFIG,
+    );
     expect(hasConfig).toBe(true);
-    expect(CHESSUP_HANDSHAKE[0]).toEqual([ChessUpCommand.RESET]);
+    // No reset(64) anywhere — it triggers firmware-update mode.
+    const hasReset = CHESSUP_HANDSHAKE_AFTER_TRADEMARK.some((m) => m[0] === 64);
+    expect(hasReset).toBe(false);
   });
 });
 

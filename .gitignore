@@ -5,7 +5,10 @@ dist/
 coverage/
 .playwright-mcp/
 
-# Proprietary third-party reference (minified ChessConnect extension) — kept
-# locally for reverse-engineering, never committed. Protocols live in
-# packages/chess-board-link/PROTOCOLS.md.
+# Proprietary third-party reference (the ChessConnect extension and anything
+# derived from it: a beautified copy, and an instrumented copy used to capture
+# real board traffic). Kept locally for reverse-engineering, never committed.
+# Protocols live in packages/chess-board-link/PROTOCOLS.md.
 reference/chessconnect-extension/
+reference/chessconnect-beautified/
+reference/chessconnect-instrumented/

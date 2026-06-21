@@ -8,9 +8,10 @@ import {
   CHESSUP_ACK,
   ChessUpMessageReader,
   ChessUpOpcode,
-  CHESSUP_HANDSHAKE,
+  CHESSUP_HANDSHAKE_AFTER_TRADEMARK,
   CHESSUP_IN_POSITION,
   CHESSUP_IN_REQUEST,
+  CHESSUP_IN_TRADEMARK,
   CHESSUP_NAME_PREFIX,
   CHESSUP_NOTIFY_UUID,
   CHESSUP_SERVICE_UUID,
@@ -52,6 +53,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   private readonly game = new Chess();
   /** Occupancy we last applied, to ignore duplicate/transient snapshots. */
   private lastOccupancy: boolean[] | null = null;
+  /** Resolves when the board answers the TRADEMARK (71) challenge with 146. */
+  private trademarkResolver: (() => void) | null = null;
 
   constructor() {
     super();
@@ -77,10 +80,12 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       this.game.reset();
       this._state = startingBoard();
       this.lastOccupancy = occupancyOf(this._state);
-      // Full handshake: reset + CONFIG (puts the board in "app interaction"
-      // mode so it reports moves) + dump request. Without CONFIG the board
-      // stays idle and emits nothing.
-      for (const [command, ...rest] of CHESSUP_HANDSHAKE) {
+      // Handshake (from the extension's initializeBoard): first the TRADEMARK
+      // (71) auth challenge — wait for the board's reply (146) — then the CONFIG
+      // messages that enable "app interaction" mode, then a dump request. There
+      // is NO reset(64): sending one drops the board into firmware-update mode.
+      await this.doTrademark();
+      for (const [command, ...rest] of CHESSUP_HANDSHAKE_AFTER_TRADEMARK) {
         await this.send(command!, rest.length ? rest : undefined);
       }
       this.setStatus('connected');
@@ -92,8 +97,28 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   }
 
   async disconnect(): Promise<void> {
+    this.trademarkResolver = null;
     await this.transport.disconnect();
     this.setStatus('disconnected');
+  }
+
+  /**
+   * Send the TRADEMARK (71) challenge and resolve once the board answers with
+   * command 146. Times out after 3s so a non-responding board doesn't hang the
+   * connect (we then proceed with the rest of the handshake best-effort).
+   */
+  private async doTrademark(): Promise<void> {
+    const waitReply = new Promise<void>((resolve) => {
+      this.trademarkResolver = resolve;
+      setTimeout(() => {
+        if (this.trademarkResolver) {
+          this.trademarkResolver = null;
+          resolve();
+        }
+      }, 3000);
+    });
+    await this.send(ChessUpCommand.TRADEMARK);
+    await waitReply;
   }
 
   /**
@@ -120,7 +145,11 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     this.reportIo('received', data);
     try {
       for (const msg of this.reader.push(data)) {
-        if (msg.command === ChessUpOpcode.MOVE) {
+        if (msg.command === CHESSUP_IN_TRADEMARK) {
+          // Board answered the auth challenge — release the connect handshake.
+          this.trademarkResolver?.();
+          this.trademarkResolver = null;
+        } else if (msg.command === ChessUpOpcode.MOVE) {
           // Clean path: the board reports the completed move directly.
           this.handleMove(parseChessUpMoveFromData(msg.data));
           void this.write(CHESSUP_ACK).catch(() => {}); // parity-encoded ACK
