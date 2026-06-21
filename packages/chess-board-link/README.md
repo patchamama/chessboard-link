@@ -119,7 +119,7 @@ Three columns: **1. Board** · **2. What it does** (status + transport) ·
 |----------|-----------------|------------------|
 | **Chessnut** Air / Pro | ✅ Real-time board reads over **Web Bluetooth (BLE)** | UUIDs (`1b7e826x`), enable cmd `0x21 0x01 0x00`, 32-byte→64-nibble decode (`r=7-⌊i/4⌋, c=7-(i%4)*2`), `CHESSNUT_PIECE_LUT`, LED bitmap |
 | **DGT** e-Board | ✅ Move/position reads over **Web Serial (USB)**, 9600 baud | Commands `0x40/0x42/0x4b`, framed `BOARD_DUMP 0x06` / `FIELD_UPDATE 0x0e`, 0–12 piece codes, message reader |
-| **ChessUp** | 🧪 Move events **and LEDs** over **BLE (Nordic UART)** — verified from source, not hardware | UUIDs `6e40000x`, opcodes (163 move / 151 promo / 184 touch / 38 err), move parse + castling normalisation, ACK, **parity-encoded writes** (`computeXParity`), **`setLeds`** (8-byte bitmap) |
+| **ChessUp** | 🧪 Occupancy + LEDs over **BLE (Nordic UART)** — protocol confirmed against a real board | UUIDs `6e40000x`, **message framing** (bit-7 start + size bytes), **parity-encoded writes** (`computeXParity`), handshake (reset 64 / dump 66), **occupancy** via command 134 (RFID, 5/sq), moves inferred with chess.js, **`setLeds`** (8-byte bitmap) |
 | **iChessOne** | 🧪 Position reads over **BLE (Nordic UART)** — verified from source | UUIDs `6e40000x`, ASCII position frame (`'s'`+64 chars), index `7-file+1+8*rank`, command-length map |
 | **Mock** | ✅ No hardware — scripted snapshots for dev/demo | Starting position, `applyBoardState()`, `playback()` |
 | GoChess, Millennium, Certabo, Tabutronic/Sentio, Staunton, Yizhi, SenseRobot, Phantom, ManyaCynus, DGT Pegasus/Revelation II | ⏳ Not ported | UUIDs / init / transport documented in [PROTOCOLS.md](./PROTOCOLS.md) |

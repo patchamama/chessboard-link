@@ -18,12 +18,21 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
 
 - Service `6e400001-b5a3-f393-e0a9-e50e24dcca9e`, write `6e400002-…`, notify `6e400003-…`, plus battery service.
 - Device filter: `namePrefix: "ChessUp"`.
-- **Move-based** (not occupancy): inbound frames are `[opcode, …]`.
-  - `163` MOVE — `[163, 53, fromRow, fromCol, toRow, toCol, …]`, where row 0..7 =
-    rank 1..8, col 0..7 = a..h. Castling reported king→rook (e1→h1), normalised
-    to king-target (e1g1).
-  - `151` PROMOTION, `184` PIECE_TOUCHED, `38` ERROR.
-- After a move the host writes ACK `Uint8Array([33])`.
+- **Message framing** (corrected against a real board's traffic; the earlier
+  "`[163,…]` move frame" idea was wrong):
+  - *Outgoing* (`St`/`encodeMessage`): `[command]` for a bare command, or
+    `[command, size, …data, 0]` with `size = data.length + 1` and a `0`
+    terminator. Then parity-encoded (see below). Commands seen: `64` reset,
+    `66` request board dump, `96` config, `99` send-move-to-board (light it).
+  - *Incoming* (`processDataFromBoard`): a byte with **bit 7 set** starts a
+    message (low 7 bits = command); the next one/two 7-bit bytes are the size;
+    remaining bytes are data. Incoming bytes are **not** parity-encoded.
+- **Position = occupancy via command `134`** (`parsePosition`): the data holds
+  **five numbers per square** (an RFID tag); a square is occupied when any of the
+  five is non-zero. Square index `8*(7-s)+a`. Identifying the actual piece needs
+  the board's *learned* RFID→piece table (per piece set), so without it you get
+  occupancy only — enough to infer moves from the start position with chess.js.
+  Command `142` = board asks the host for a dump; `160` battery; `141` clock.
 - **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
   `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:
   `this.connectionType===BLUETOOTH&&(e=Ut.computeXParity(e))` before each write.
@@ -33,8 +42,11 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
   like everything else). ChessUp 2 (`encodeLedState9x9rgb`) sends a 247-byte RGB
   frame `[255,85] + 243×RGB + [13,10]` — not ported.
 - Source: `const cs="ChessUp",ls="6e400001-…",ds="6e400002-…",hs="6e400003-…"`,
-  `onMoveFromBoard(e){…W(e[3],e[2]),W(e[5],e[4])…sendDataToBoard(Uint8Array.from([33]))}`,
-  and `encodeLedState(e){…t[7-s]|=1<<i…}`.
+  `encodeMessage(e){…[e.command, size, …data, 0]…}`, the incoming parser
+  `processDataFromBoard(e){for(const t of e){if(128&t)…}}`, the command switch
+  `case 134: parsePosition(e)` / `case 142: sendMessageToBoard(new St(66))`,
+  `parsePosition` (5 numbers per square, index `8*(7-s)+a`), and
+  `encodeLedState(e){…t[7-s]|=1<<i…}`.
 
 ## ✅ Chessnut Air / Pro (BLE)
 

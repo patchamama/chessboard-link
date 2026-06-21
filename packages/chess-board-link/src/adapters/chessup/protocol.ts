@@ -15,15 +15,21 @@ export const CHESSUP_WRITE_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 export const CHESSUP_NOTIFY_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 export const CHESSUP_NAME_PREFIX = 'ChessUp';
 
-/** First byte (opcode) of an inbound frame. */
+/**
+ * @deprecated Early (incorrect) assumption that ChessUp emits parity-free
+ * `[163, …]` move frames. Real boards frame messages with a bit-7 start marker
+ * and report **occupancy** under command {@link CHESSUP_IN_POSITION} (134); use
+ * {@link ChessUpMessageReader} + {@link decodeChessUpOccupancy} instead. Kept
+ * only so older imports/tests still resolve.
+ */
 export const ChessUpOpcode = {
-  MOVE: 163, // a completed move: bytes [163, 53, fromRow, fromCol, toRow, toCol, ...]
-  PROMOTION: 151, // promotion piece selected on the board
-  PIECE_TOUCHED: 184, // a piece was lifted/touched (hint, not a move)
+  MOVE: 163,
+  PROMOTION: 151,
+  PIECE_TOUCHED: 184,
   ERROR: 38,
 } as const;
 
-/** Acknowledgement the extension writes back after receiving a move (opcode 33). */
+/** @deprecated See {@link ChessUpOpcode}. */
 export const CHESSUP_ACK = new Uint8Array([33]);
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
@@ -106,4 +112,106 @@ export function encodeChessUpLeds(leds: LedState[]): Uint8Array {
     out[7 - rank]! |= 1 << file;
   }
   return out;
+}
+
+/**
+ * ChessUp message framing (from the extension's `St` / `encodeMessage` and the
+ * inbound parser in `processDataFromBoard`).
+ *
+ * Outgoing: `[command]` for a bare command, or `[command, size, ...data, 0]`
+ * where `size = data.length + 1` and a `0` terminator follows the data. Every
+ * byte is then parity-encoded for BLE (see {@link applyParity}).
+ *
+ * Incoming: a byte with bit 7 set starts a new message (its low 7 bits are the
+ * command); the next one or two 7-bit bytes give the size; remaining bytes are
+ * the data. Incoming bytes are NOT parity-encoded.
+ */
+export const ChessUpCommand = {
+  RESET: 64, // 0x40 — reset the board
+  REQUEST_DUMP: 66, // 0x42 — ask the board to send its current position
+  CONFIG: 96, // 0x60 — configuration messages (St(96, [...]))
+  SEND_MOVE: 99, // 0x63 — tell the board a move (e.g. to light it)
+} as const;
+
+/** Command id of an inbound POSITION message. */
+export const CHESSUP_IN_POSITION = 134;
+/** Inbound: board asks the host for a dump. */
+export const CHESSUP_IN_REQUEST = 142;
+
+/** Build an outgoing message payload (pre-parity). */
+export function encodeChessUpMessage(command: number, data?: number[]): Uint8Array {
+  if (!data || data.length === 0) return Uint8Array.from([command]);
+  const size = data.length + 1;
+  return Uint8Array.from([command, size, ...data, 0]);
+}
+
+interface InMessage {
+  command: number;
+  size: number;
+  data: number[];
+}
+
+/**
+ * Stateful reader for the inbound ChessUp byte stream. Feed it raw notification
+ * bytes; it yields complete messages. Mirrors the extension's incoming parser
+ * (bit-7 start marker, up-to-two 7-bit size bytes, then `size - 3` data bytes).
+ */
+export class ChessUpMessageReader {
+  private cur: (InMessage & { needSecondSizeByte: boolean }) | null = null;
+
+  push(bytes: Uint8Array): InMessage[] {
+    const out: InMessage[] = [];
+    for (const t of bytes) {
+      if (t & 0x80) {
+        // Start of a new message; command is the low 7 bits.
+        this.cur = { command: t & 0x7f, size: 0, data: [], needSecondSizeByte: false };
+      } else if (this.cur) {
+        if (this.cur.size === 0 && !this.cur.needSecondSizeByte && this.cur.data.length === 0) {
+          // First size byte (high 7 bits).
+          this.cur.size = t << 7;
+          this.cur.needSecondSizeByte = true;
+        } else if (this.cur.needSecondSizeByte) {
+          this.cur.size += t & 0x7f;
+          this.cur.needSecondSizeByte = false;
+        } else {
+          this.cur.data.push(t);
+          if (this.cur.data.length >= this.cur.size - 3) {
+            out.push({ command: this.cur.command, size: this.cur.size, data: this.cur.data });
+            this.cur = null;
+          }
+        }
+      }
+    }
+    return out;
+  }
+}
+
+/**
+ * Decode a POSITION message's data into board occupancy. ChessUp reports five
+ * numbers per square (an RFID-style tag); a square is occupied when any of the
+ * five is non-zero. Square index is `8*rank + file` (rank/file 0..7, white = 0).
+ *
+ * Returns a 64-entry boolean array in a8..h1 order (true = occupied).
+ *
+ * Note: identifying *which* piece sits on a square needs the board's learned
+ * RFID→piece table, which is per-piece-set. Without it we only know occupancy,
+ * which is enough to infer moves from the starting position (like other boards).
+ */
+export function decodeChessUpOccupancy(data: number[]): boolean[] {
+  const occ = new Array<boolean>(64).fill(false);
+  for (let s = 0; s < 8; s++) {
+    for (let a = 0; a < 8; a++) {
+      const o = 8 * (7 - s) + a; // index into the 5-per-square stream
+      let occupied = false;
+      for (let k = 0; k < 5; k++) {
+        if ((data[5 * o + k] ?? 0) !== 0) {
+          occupied = true;
+          break;
+        }
+      }
+      // a8..h1 board index: rank s (0 = rank 1) at file a.
+      occ[(7 - s) * 8 + a] = occupied;
+    }
+  }
+  return occ;
 }
