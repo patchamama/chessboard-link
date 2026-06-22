@@ -124,16 +124,20 @@ export function parseChessUpMove(data: Uint8Array): DetectedMove | null {
 }
 
 /**
- * Encode a FEN to the board's SEND_FEN payload (`fen2Uint8`): the first four FEN
- * fields joined by spaces as ASCII, followed by the halfmove clock and the
- * fullmove number (high, low bytes).
+ * Encode a FEN into the SEND_FEN message data, i.e. `[len, ...payload]` so the
+ * full BLE message becomes `[102, len, ...payload]` (the `66 38 …` in the logs).
+ *
+ * Verified byte-for-byte against a real board: payload = the first four FEN
+ * fields joined by spaces **plus a trailing space** (e.g.
+ * `"rnbqkbnr/… w KQkq - "`), then 3 bytes: halfmove, fullmove-hi, fullmove-lo.
+ * `len = payload.length` (= ASCII length + 3).
  */
 export function encodeChessUpFen(fen: string): number[] {
   const parts = fen.trim().split(/\s+/);
-  const head = parts.slice(0, 4).join(' ');
+  const head = parts.slice(0, 4).join(' ') + ' '; // note the trailing space
   const halfmove = Number(parts[4] ?? 0) || 0;
   const fullmove = Number(parts[5] ?? 1) || 1;
-  const bytes = Array.from(head, (c) => c.charCodeAt(0));
-  bytes.push(halfmove & 0xff, (fullmove >> 8) & 0xff, fullmove & 0xff);
-  return bytes;
+  const payload = Array.from(head, (c) => c.charCodeAt(0));
+  payload.push(halfmove & 0xff, (fullmove >> 8) & 0xff, fullmove & 0xff);
+  return [payload.length, ...payload]; // [len, ...payload]
 }

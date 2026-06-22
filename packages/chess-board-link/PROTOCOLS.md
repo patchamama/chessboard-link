@@ -25,21 +25,29 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
 - **Messages:** outgoing is `[opcode, …data]` (then parity-encoded for BLE, see
   below); inbound is `[opcode, …data]` and is **not** parity-encoded. The opcode
   is the raw first byte (e.g. `163`).
-- **Connect handshake** (`startGame`), in order:
+- **Connect handshake** (`startGame`), in order — **verified byte-for-byte from
+  real boards on both lichess and chess.com**:
   1. `RESET` `[100]` (0x64).
-  2. `SEND_FEN` `[102, len, …fenBytes]` (0x66) — FEN as ASCII (first 4 fields
-     joined by spaces) + halfmove + fullmove hi/lo. Board replies opcode `177`.
-  3. `GAME_SETTINGS` `[185, 2,0,1,1,0,1,1,0, …]` (0xB9) — app-vs-board settings.
-     Board replies opcode `36`.
-  (An earlier 6.0.3-based guess used different/extra bytes and dropped the board
+  2. `SEND_FEN` `[102, len, …payload]` (0x66). Captured exactly:
+     `66 38 72 6e … 20 2d 20 00 00 01`. Here `len = 0x38 = 56 = payload length`.
+     The payload is the first 4 FEN fields joined by spaces **plus a trailing
+     space** (`"rnbqkbnr/… w KQkq - "`, 53 chars), then 3 bytes:
+     halfmove, fullmove-hi, fullmove-lo (`00 00 01`).
+  3. `GAME_SETTINGS` `[185, 2,0,1,1,0,1,1,0,0,1,0]` (0xB9) — app-vs-board settings.
+  The board does **not** send explicit reply opcodes between steps; it pushes a
+  position notification after the FEN. The extension paces the steps ~100–300ms
+  apart. (An earlier 6.0.3-based guess sent different bytes and dropped the board
   into firmware-update mode, "update ready, plug in the charging cable".)
+- **Reading moves:** the host **polls** by sending `21` (0x21); the board then
+  reports the move. Logs show `sending to ChessUpBoard: 21` →
+  `received move from board: (e2)->(e4)`.
 - **Move (inbound, opcode `163`):** `[163, 53, fromCol, fromRow, toCol, toRow]`
-  — the extension reads `from = W(e[3], e[2])`, `to = W(e[5], e[4])` with
-  `W(row, col)`, so fromRow=`e[3]`, fromCol=`e[2]`, toRow=`e[5]`, toCol=`e[4]`
-  (row 0..7 = rank 1..8, col 0..7 = a..h). Castling reported king→rook,
-  normalised to UCI king-target. Host ACKs with `[33]` (parity-encoded).
-- **Send move to board (LEDs/hint), opcode `153`:** `[153, fromIndex, toIndex]`
-  where index = `row*8 + col` (`fieldToIndex`).
+  — `from = W(e[3], e[2])`, `to = W(e[5], e[4])`, `W(row, col)` (row 0..7 = rank
+  1..8, col 0..7 = a..h). Castling king→rook, normalised to UCI king-target.
+  Host ACKs with `[33]` (parity-encoded).
+- **Send move to board (light the opponent's move), opcode `153`:**
+  `[153, fromIndex, toIndex]`, index = `row*8 + col` (`fieldToIndex`). Verified:
+  `99 34 24` for e7e5 (e7 = 6*8+4 = 52 = 0x34, e5 = 4*8+4 = 36 = 0x24).
 - Other inbound opcodes: `151` promotion, `184` piece-touched, `38` error.
 - **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
   `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:

@@ -89,10 +89,14 @@ describe('ChessUp commands + helpers', () => {
     expect(fieldToIndex(3, 4)).toBe(28); // e4
   });
 
-  it('encodeChessUpFen prefixes the FEN as ASCII + move counters', () => {
+  it('encodeChessUpFen matches the verified board bytes (66 38 …)', () => {
+    // From a real board's log: [len, ...ascii("…w KQkq - "), 0, 0, 1].
     const bytes = encodeChessUpFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-    expect(bytes[0]).toBe('r'.charCodeAt(0));
-    expect(bytes).toContain(32); // a space between FEN fields
-    expect(bytes.slice(-3)).toEqual([0, 0, 1]); // halfmove 0, fullmove hi 0, lo 1
+    expect(bytes[0]).toBe(56); // length byte (0x38) = payload length
+    expect(bytes.length).toBe(57); // len byte + 56 payload bytes
+    // payload = ASCII (53 chars incl. trailing space) + [0,0,1]
+    const ascii = bytes.slice(1, bytes.length - 3).map((b) => String.fromCharCode(b)).join('');
+    expect(ascii).toBe('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - ');
+    expect(bytes.slice(-3)).toEqual([0, 0, 1]); // halfmove, fullmove hi, lo
   });
 });
