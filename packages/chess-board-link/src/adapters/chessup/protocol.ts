@@ -73,6 +73,7 @@ export const ChessUpCommand = {
   GAME_SETTINGS: 185, // 0xB9 — [185, 2,0,1,1,0,1,1,0, ...]; board replies opcode 36
   SEND_MOVE: 153, // 0x99 — [153, fromIndex, toIndex] (light a move on the board)
   ACK: 33, // 0x21 — acknowledge a received move
+  POLL: 33, // 0x21 — poll the board for a pending move (same byte as ACK)
 } as const;
 
 /** Inbound opcodes (the raw first byte of a notification). */

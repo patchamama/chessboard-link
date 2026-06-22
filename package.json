@@ -1,7 +1,7 @@
 {
   "name": "chess-api-adapter-workspace",
   "private": true,
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Workspace for chess-board-link library and its web test app.",
   "type": "module",
   "engines": {

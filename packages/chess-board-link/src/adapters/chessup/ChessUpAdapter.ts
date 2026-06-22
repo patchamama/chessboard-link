@@ -49,11 +49,16 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     namePrefixes: [CHESSUP_NAME_PREFIX],
   });
   private readonly game = new Chess();
+  /** Periodic poll timer (the board reports moves only when polled with 0x21). */
+  private pollTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor() {
     super();
     this.transport.setDataHandler((data) => this.handleData(data));
-    this.transport.setDisconnectHandler(() => this.setStatus('disconnected'));
+    this.transport.setDisconnectHandler(() => {
+      this.stopPolling();
+      this.setStatus('disconnected');
+    });
   }
 
   get deviceId(): string | undefined {
@@ -87,13 +92,31 @@ export class ChessUpAdapter extends BaseBoardAdapter {
 
       this.setStatus('connected');
       this.emit('boardState', this._state);
+      // The board reports moves only when polled. Poll periodically with 0x21.
+      this.startPolling();
     } catch (error) {
       this.setStatus('error');
       throw error;
     }
   }
 
+  /** Begin polling the board for pending moves (host sends 0x21 periodically). */
+  private startPolling(intervalMs = 500): void {
+    this.stopPolling();
+    this.pollTimer = setInterval(() => {
+      void this.send(ChessUpCommand.POLL).catch(() => {});
+    }, intervalMs);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== undefined) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = undefined;
+    }
+  }
+
   async disconnect(): Promise<void> {
+    this.stopPolling();
     await this.transport.disconnect();
     this.setStatus('disconnected');
   }
