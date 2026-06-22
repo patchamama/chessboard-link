@@ -22,9 +22,12 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
 > which is simpler than v6.0.3. There is **no** bit-7 framing or message-size
 > bytes: the first byte is the opcode directly.
 
-- **Messages:** outgoing is `[opcode, …data]` (then parity-encoded for BLE, see
-  below); inbound is `[opcode, …data]` and is **not** parity-encoded. The opcode
-  is the raw first byte (e.g. `163`).
+- **Messages are RAW bytes — no parity.** Confirmed live against a real board:
+  both outgoing and inbound are `[opcode, …data]` with the opcode as the raw
+  first byte (e.g. `163`). An earlier version XOR-parity-encoded the writes
+  (`computeXParity`) and the board rejected them with `error 0x26/38`; sending
+  raw bytes lit the squares and produced a clean move report. (The extension's
+  `computeXParity` path applies to a different transport/board, not ChessUp BLE.)
 - **Connect handshake** (`startGame`), in order — **verified byte-for-byte from
   real boards on both lichess and chess.com**:
   1. `RESET` `[100]` (0x64).
@@ -44,19 +47,17 @@ SENSEROBOT=12, PHANTOM=13, GOCHESS=14, MANYACYNUS=15
 - **Move (inbound, opcode `163`):** `[163, 53, fromCol, fromRow, toCol, toRow]`
   — `from = W(e[3], e[2])`, `to = W(e[5], e[4])`, `W(row, col)` (row 0..7 = rank
   1..8, col 0..7 = a..h). Castling king→rook, normalised to UCI king-target.
-  Host ACKs with `[33]` (parity-encoded).
+  Host ACKs with `[33]` (raw). **Verified live:** the board reported e2e4 as
+  `a3 35 04 01 04 03` (= 163, 53, col4 row1 = e2, col4 row3 = e4).
 - **Send move to board (light the opponent's move), opcode `153`:**
   `[153, fromIndex, toIndex]`, index = `row*8 + col` (`fieldToIndex`). Verified:
   `99 34 24` for e7e5 (e7 = 6*8+4 = 52 = 0x34, e5 = 4*8+4 = 36 = 0x24).
-- Other inbound opcodes: `151` promotion, `184` piece-touched, `38` error.
-- **Parity:** every byte sent over BLE is parity-encoded by `computeXParity` /
-  `addParityBit`: `e |= 0x80; for i in 0..6 if (e & (1<<i)) e ^= 0x80`. Source:
-  `this.connectionType===BLUETOOTH&&(e=Ut.computeXParity(e))` before each write.
+- Other inbound opcodes: `151` promotion, `184` piece-touched, `38` error,
+  `0x6c`/108 spontaneous status frames.
 - **LEDs** (non-RGB ChessUp 1, `encodeLedStateSimple`): an 8-byte bitmap where
-  byte `7-rank` has bit `1<<file` set per lit square (rank/file 0..7, white = 0).
-  Sent via `sendLedStateToBoard` → `sendDataToBoard` (so it is parity-encoded
-  like everything else). ChessUp 2 (`encodeLedState9x9rgb`) sends a 247-byte RGB
-  frame `[255,85] + 243×RGB + [13,10]` — not ported.
+  byte `7-rank` has bit `1<<file` set per lit square (rank/file 0..7, white = 0),
+  sent raw. ChessUp 2 (`encodeLedState9x9rgb`) sends a 247-byte RGB frame
+  `[255,85] + 243×RGB + [13,10]` — not ported.
 - Source (v5.9.1 beautified): `startGame()` →
   `sendDataToBoard(Uint8Array.from([100]))`,
   `sendDataToBoard(new Uint8Array([102, i.length, ...i]))` (FEN, wait `e[0]===177`),

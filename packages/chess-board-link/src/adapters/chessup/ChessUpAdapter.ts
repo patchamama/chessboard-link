@@ -4,7 +4,6 @@ import { boardToFen, fenToBoard, startingBoard } from '../../core/boardState.js'
 import type { DetectedMove, LedState, TransportType } from '../../core/types.js';
 import { WebBluetoothTransport } from '../../transports/WebBluetoothTransport.js';
 import {
-  applyParity,
   CHESSUP_ACK,
   CHESSUP_GAME_SETTINGS,
   CHESSUP_NAME_PREFIX,
@@ -138,10 +137,17 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     await this.write(payload);
   }
 
-  /** Parity-encode a payload and write it; logs the pre-parity bytes. */
+  /**
+   * Write a payload to the board. ChessUp BLE uses **raw bytes** (no parity):
+   * confirmed live against hardware — the handshake (64 / 66 … / b9 …), the
+   * poll (21) and the ACK (33) are all sent raw, and the board lit its squares
+   * and reported the move `a3 35 04 01 04 03` (= 163,53,e2,e4) only with raw
+   * sends. (An earlier version parity-encoded these and the board rejected them
+   * with error 0x26/38.)
+   */
   private async write(payload: Uint8Array): Promise<void> {
     this.reportIo('sent', payload);
-    await this.transport.write(applyParity(payload));
+    await this.transport.write(payload);
   }
 
   private handleData(view: DataView): void {
@@ -151,7 +157,7 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       switch (data[0]) {
         case ChessUpInbound.MOVE:
           this.handleMove(parseChessUpMove(data));
-          void this.write(CHESSUP_ACK).catch(() => {}); // parity-encoded ACK
+          void this.write(CHESSUP_ACK).catch(() => {}); // raw ACK [33]
           break;
         case ChessUpInbound.ERROR:
           this.reportError(new Error('ChessUp board reported an error (opcode 38)'));
