@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BLE Bridge — ChessUp live debug</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; background: #14161a; color: #e6e6e6; }
+      header { padding: 0.8rem 1rem; border-bottom: 1px solid #2a2e36; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+      h1 { font-size: 1rem; margin: 0; }
+      button, input, select { background: #21252b; color: #e6e6e6; border: 1px solid #3a3f47; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; }
+      button { cursor: pointer; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      button.primary { background: #2f7d4f; border-color: #2f7d4f; font-weight: 600; }
+      .status { margin-left: auto; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.8rem; background: #444; }
+      .status.connected { background: #1f7a3f; }
+      .status.error { background: #8a1f1f; }
+      .row { display: flex; gap: 0.5rem; padding: 0.6rem 1rem; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #2a2e36; }
+      .row label { font-size: 0.8rem; color: #9aa0a6; }
+      input.hex { width: 28rem; max-width: 60vw; font-family: ui-monospace, monospace; }
+      #log { font-family: ui-monospace, monospace; font-size: 0.8rem; padding: 0.5rem 1rem; height: 70vh; overflow: auto; }
+      .tx { color: #f2a154; }
+      .rx { color: #4aa3ff; }
+      .info { color: #9aa0a6; }
+      .err { color: #ff6b6b; }
+      .ts { color: #6b7280; margin-right: 0.5rem; }
+      .tag { display: inline-block; min-width: 3.2rem; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>BLE Bridge — ChessUp</h1>
+      <button id="connect" class="primary">Connect (Bluetooth)</button>
+      <button id="disconnect" disabled>Disconnect</button>
+      <label><input type="checkbox" id="parityTx" /> parity TX</label>
+      <label><input type="checkbox" id="parityRx" /> de-parity RX</label>
+      <span id="status" class="status">disconnected</span>
+    </header>
+
+    <div class="row">
+      <label>Send hex</label>
+      <input class="hex" id="hexInput" placeholder="e.g. 64   or   66 38 72 6e ...   or   21" />
+      <button id="send" disabled>Send</button>
+      <button id="clear">Clear log</button>
+      <span class="info">Presets:</span>
+      <button class="preset" data-hex="64" disabled>reset(64)</button>
+      <button class="preset" data-hex="21" disabled>poll(21)</button>
+      <button id="handshake" disabled>FEN+settings handshake</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+      // ChessUp Nordic UART
+      const SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+      const WRITE = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+      const NOTIFY = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+      const $ = (id) => document.getElementById(id);
+      const logEl = $('log');
+      const state = { device: null, server: null, writeChar: null, notifyChar: null, log: [] };
+
+      const ts = () => new Date().toISOString().slice(11, 23);
+      const hex = (u) => Array.from(u).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+      const ascii = (u) => Array.from(u).map((b) => { const c = b & 0x7f; return c >= 32 && c < 127 ? String.fromCharCode(c) : '.'; }).join('');
+
+      function addParity(b) { let e = b | 128; for (let t = 0; t < 7; t++) if (e & (1 << t)) e ^= 128; return e & 0xff; }
+      function applyParity(u) { return Uint8Array.from(u, addParity); }
+      function stripParity(u) { return Uint8Array.from(u, (b) => b & 0x7f); }
+
+      function log(kind, text) {
+        const entry = { ts: ts(), kind, text };
+        state.log.push(entry);
+        if (state.log.length > 500) state.log.shift();
+        const div = document.createElement('div');
+        div.className = kind;
+        div.innerHTML = `<span class="ts">${entry.ts}</span><span class="tag">${kind.toUpperCase()}</span> ${text}`;
+        logEl.appendChild(div);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function setStatus(s) {
+        const el = $('status');
+        el.textContent = s;
+        el.className = 'status ' + (s === 'connected' ? 'connected' : s === 'error' ? 'error' : '');
+        const connected = s === 'connected';
+        $('disconnect').disabled = !connected;
+        $('send').disabled = !connected;
+        $('handshake').disabled = !connected;
+        document.querySelectorAll('.preset').forEach((b) => (b.disabled = !connected));
+        $('connect').disabled = connected;
+      }
+
+      function parseHex(str) {
+        const clean = str.trim().replace(/0x/g, '').replace(/[,]/g, ' ');
+        const parts = clean.split(/\s+/).filter(Boolean);
+        return Uint8Array.from(parts.map((p) => parseInt(p, 16) & 0xff));
+      }
+
+      async function connect() {
+        try {
+          setStatus('connecting');
+          log('info', 'requesting device (pick your ChessUp in the picker)…');
+          state.device = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [SERVICE] }, { namePrefix: 'ChessUp' }],
+            optionalServices: [SERVICE],
+          });
+          log('info', `device: ${state.device.name} (${state.device.id})`);
+          state.device.addEventListener('gattserverdisconnected', () => { log('info', 'gattserverdisconnected'); setStatus('disconnected'); });
+          state.server = await state.device.gatt.connect();
+          const svc = await state.server.getPrimaryService(SERVICE);
+          state.writeChar = await svc.getCharacteristic(WRITE);
+          state.notifyChar = await svc.getCharacteristic(NOTIFY);
+          await state.notifyChar.startNotifications();
+          state.notifyChar.addEventListener('characteristicvaluechanged', (ev) => {
+            const v = ev.target.value;
+            const raw = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+            const shown = $('parityRx').checked ? stripParity(raw) : raw;
+            log('rx', `${hex(shown)}    | ascii "${ascii(shown)}"`);
+          });
+          setStatus('connected');
+          log('info', 'connected; notifications on. Ready for commands.');
+        } catch (e) {
+          log('err', 'connect failed: ' + e.message);
+          setStatus('error');
+        }
+      }
+
+      async function send(bytes) {
+        if (!state.writeChar) return log('err', 'not connected');
+        const out = $('parityTx').checked ? applyParity(bytes) : bytes;
+        try {
+          if (state.writeChar.properties.writeWithoutResponse) await state.writeChar.writeValueWithoutResponse(out);
+          else await state.writeChar.writeValue(out);
+          log('tx', `${hex(out)}${$('parityTx').checked ? '  (parity of ' + hex(bytes) + ')' : ''}`);
+        } catch (e) {
+          log('err', 'write failed: ' + e.message);
+        }
+      }
+
+      async function disconnect() {
+        try { await state.notifyChar?.stopNotifications(); } catch {}
+        state.server?.disconnect();
+        setStatus('disconnected');
+      }
+
+      function fenMessage(fen) {
+        const parts = fen.trim().split(/\s+/);
+        const head = parts.slice(0, 4).join(' ') + ' ';
+        const halfmove = Number(parts[4] ?? 0) || 0;
+        const fullmove = Number(parts[5] ?? 1) || 1;
+        const payload = Array.from(head, (c) => c.charCodeAt(0));
+        payload.push(halfmove & 0xff, (fullmove >> 8) & 0xff, fullmove & 0xff);
+        return Uint8Array.from([102, payload.length, ...payload]);
+      }
+
+      async function handshake() {
+        const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        log('info', '— handshake start —');
+        await send(Uint8Array.from([100])); // reset
+        await new Promise((r) => setTimeout(r, 120));
+        await send(fenMessage(START));
+        await new Promise((r) => setTimeout(r, 320));
+        await send(Uint8Array.from([185, 2, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0])); // game settings
+        log('info', '— handshake sent —');
+      }
+
+      $('connect').onclick = connect;
+      $('disconnect').onclick = disconnect;
+      $('send').onclick = () => send(parseHex($('hexInput').value));
+      $('hexInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(parseHex($('hexInput').value)); });
+      $('clear').onclick = () => { logEl.innerHTML = ''; state.log = []; };
+      $('handshake').onclick = handshake;
+      document.querySelectorAll('.preset').forEach((b) => (b.onclick = () => send(parseHex(b.dataset.hex))));
+
+      // Hooks for Playwright/CDP-driven debugging.
+      window.cblBridge = {
+        connectState: () => $('status').textContent,
+        send: (hexStr) => send(parseHex(hexStr)),
+        sendBytes: (arr) => send(Uint8Array.from(arr)),
+        handshake,
+        getLog: () => state.log.slice(),
+        lastRx: () => [...state.log].reverse().find((e) => e.kind === 'rx') || null,
+        clear: () => { logEl.innerHTML = ''; state.log = []; },
+        setParity: (tx, rx) => { $('parityTx').checked = !!tx; $('parityRx').checked = !!rx; },
+      };
+      log('info', 'BLE bridge ready. Click Connect and pick your ChessUp.');
+    </script>
+  </body>
+</html>
