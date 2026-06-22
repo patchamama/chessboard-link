@@ -9,11 +9,20 @@ gitignored (proprietary); they are regenerated locally as needed.
 - **`chessconnect-beautified/`** — `background.js` run through `js-beautify`
   (`npx js-beautify dist/background.js`) so the minified bundle is readable
   (~7.8k lines). Generate with the command above against the extension copy.
-- **`chessconnect-instrumented/`** — a copy of the extension with its internal
-  logger patched to also `console.log` every message (`[CC-LOG]` lines), used to
-  capture the exact bytes a real ChessUp board exchanges. See its
-  `CAPTURE-GUIDE.md` for how to load it and capture. This is how the ChessUp
-  connect handshake (TRADEMARK 71 → CONFIG …, **no reset 64**) was confirmed.
+- **`chessconnect-5.9.1-beutify/`** — a smaller, already-beautified copy of
+  ChessConnect **v5.9.1** (what shipping boards run). The current ChessUp
+  protocol in the library is derived from this version.
+- **`chessconnect-5.9.1-instrumented/`** — the 5.9.1 copy with `_ble-instrument.js`
+  prepended to `dist/background.js` and `dist/connectpage.js`. It monkeypatches
+  the Web Bluetooth API to `console.log` **every** byte written to / received
+  from the board (`[BLE]` lines) plus `requestDevice`/GATT connect — board-
+  agnostic, so it works for ChessUp, Chessnut, etc. See its `CAPTURE-GUIDE.md`.
+  This is the tool for capturing the exact handshake when adjusting any adapter.
+- **`_ble-instrument.js`** — the reusable instrumentation prologue (this file IS
+  tracked). Prepend it to any extension's BLE-using script to capture traffic:
+  `node -e 'fs.writeFileSync(f, prologue + fs.readFileSync(f))'`.
+- **`chessconnect-instrumented/`** — an earlier (6.0.3) instrumented copy that
+  patched the internal logger (`[CC-LOG]` lines). Superseded by the 5.9.1 one.
 
 ## `chessconnect-extension/`
 

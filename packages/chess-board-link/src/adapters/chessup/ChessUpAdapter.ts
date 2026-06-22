@@ -49,6 +49,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
     namePrefixes: [CHESSUP_NAME_PREFIX],
   });
   private readonly game = new Chess();
+  /** Pending one-shot waiters for an inbound opcode, keyed by opcode. */
+  private readonly opcodeWaiters = new Map<number, () => void>();
 
   constructor() {
     super();
@@ -74,10 +76,15 @@ export class ChessUpAdapter extends BaseBoardAdapter {
       this.game.reset();
       this._state = startingBoard();
 
-      // Handshake (startGame): reset, send the starting FEN, then game settings.
+      // Handshake (mirrors the extension's startGame): reset, send the starting
+      // FEN and WAIT for the board's reply (opcode 177), then game settings and
+      // WAIT for its reply (opcode 36). The board needs each round-trip before
+      // the next step — sending all three back-to-back leaves it idle.
       await this.send(ChessUpCommand.RESET);
       await this.send(ChessUpCommand.SEND_FEN, encodeChessUpFen(FULL_START_FEN));
+      await this.waitForOpcode(ChessUpInbound.FEN_OK, 2000);
       await this.send(ChessUpCommand.GAME_SETTINGS, CHESSUP_GAME_SETTINGS);
+      await this.waitForOpcode(ChessUpInbound.SETTINGS_OK, 2000);
 
       this.setStatus('connected');
       this.emit('boardState', this._state);
@@ -88,6 +95,8 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   }
 
   async disconnect(): Promise<void> {
+    for (const done of this.opcodeWaiters.values()) done();
+    this.opcodeWaiters.clear();
     await this.transport.disconnect();
     this.setStatus('disconnected');
   }
@@ -98,6 +107,22 @@ export class ChessUpAdapter extends BaseBoardAdapter {
    */
   async setLeds(leds: LedState[]): Promise<void> {
     await this.write(encodeChessUpLeds(leds));
+  }
+
+  /**
+   * Resolve once an inbound message with `opcode` arrives, or after `timeoutMs`
+   * (best-effort: a non-answering board shouldn't hang the connect forever).
+   */
+  private waitForOpcode(opcode: number, timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        this.opcodeWaiters.delete(opcode);
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      this.opcodeWaiters.set(opcode, done);
+    });
   }
 
   /** Send `[command, ...data]` (raw opcode, no framing). */
@@ -118,6 +143,9 @@ export class ChessUpAdapter extends BaseBoardAdapter {
   private handleData(view: DataView): void {
     const data = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
     this.reportIo('received', data);
+    // Release any handshake step waiting on this opcode.
+    const waiter = this.opcodeWaiters.get(data[0] ?? -1);
+    if (waiter) waiter();
     try {
       switch (data[0]) {
         case ChessUpInbound.MOVE:
